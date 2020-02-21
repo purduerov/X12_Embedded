@@ -447,6 +447,21 @@ int byte_to_pwm(int byte)
 	return (exact + 0.5); //rounds up the integer by adding 0.5
 }
 
+void ramp_power(int * data){
+	if (!data[0]){
+		TIM3->CCR1 = byte_to_pwm((int)data[7]); //U7
+		TIM3->CCR2 = byte_to_pwm((int)data[6]); //U2
+		TIM3->CCR3 = byte_to_pwm((int)data[5]); //U1
+		TIM3->CCR4 = byte_to_pwm((int)data[4]); //U3
+	}
+	else{
+		TIM3->CCR1 = data[1];
+		TIM3->CCR2 = data[1];
+		TIM3->CCR3 = data[1];
+		TIM3->CCR4 = data[1];
+
+	}
+}
 void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 {
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
