@@ -69,6 +69,7 @@ int adc_val [4] = {0}; //stores the adc values from all 4 adc channels
 float MAX_VOLT = 3.3; //maximum voltage value for adc conversion
 float WANTED_VOLT = 1.5; //target voltage value for which the current is too high
 int spoof_ar [4] = {0, 127, 255, 200}; //a spoof array for testing pwm without CAN
+int max_change;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -77,6 +78,7 @@ ADC_HandleTypeDef hadc;
 CAN_HandleTypeDef hcan;
 
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim14;
 
 /* USER CODE BEGIN PV */
 
@@ -88,6 +90,7 @@ static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
 static void MX_ADC_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM14_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -133,6 +136,7 @@ int main(void)
   MX_CAN_Init();
   MX_ADC_Init();
   MX_TIM3_Init();
+  MX_TIM14_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
@@ -168,6 +172,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
     check_error = HAL_CAN_GetError(&hcan);
 	if(check_error != 0)
@@ -388,7 +393,7 @@ static void MX_TIM3_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 95;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -411,6 +416,37 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 2 */
   HAL_TIM_MspPostInit(&htim3);
+
+}
+
+/**
+  * @brief TIM14 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM14_Init(void)
+{
+
+  /* USER CODE BEGIN TIM14_Init 0 */
+
+  /* USER CODE END TIM14_Init 0 */
+
+  /* USER CODE BEGIN TIM14_Init 1 */
+
+  /* USER CODE END TIM14_Init 1 */
+  htim14.Instance = TIM14;
+  htim14.Init.Prescaler = 8000-1;
+  htim14.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim14.Init.Period = 10-1;
+  htim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim14) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM14_Init 2 */
+
+  /* USER CODE END TIM14_Init 2 */
 
 }
 
@@ -447,7 +483,7 @@ int byte_to_pwm(int byte)
 	return (exact + 0.5); //rounds up the integer by adding 0.5
 }
 
-void ramp_power(int * data){
+void ramp_power(){
 	if (!data[0]){
 		TIM3->CCR1 = byte_to_pwm((int)data[7]); //U7
 		TIM3->CCR2 = byte_to_pwm((int)data[6]); //U2
@@ -455,23 +491,24 @@ void ramp_power(int * data){
 		TIM3->CCR4 = byte_to_pwm((int)data[4]); //U3
 	}
 	else{
-		TIM3->CCR1 = data[1];
-		TIM3->CCR2 = data[1];
-		TIM3->CCR3 = data[1];
-		TIM3->CCR4 = data[1];
+		__HAL_TIM_SET_AUTORELOAD(&htim14, data[1] * 10 - 1);
+		max_change = data[2];
 
-	}
+		HAL_TIM_Base_Start(&htim14);
+		}
 }
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef * htim){
+
+}
+
 void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 {
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 	//If ID is correct and the amount of data being sent is four bytes, converts that data into PWM signals
 	if((hcan->pRxMsg->StdId == 0x202))
 	{
-		TIM3->CCR1 = byte_to_pwm((int)hcan->pRxMsg->Data[7]); //U7
-		TIM3->CCR2 = byte_to_pwm((int)hcan->pRxMsg->Data[6]); //U2
-		TIM3->CCR3 = byte_to_pwm((int)hcan->pRxMsg->Data[5]); //U1
-		TIM3->CCR4 = byte_to_pwm((int)hcan->pRxMsg->Data[4]); //U3
+		ramp_power();
 	}
   //necessary portion that restarts the CAN receiving
 	if (HAL_CAN_Receive_IT(hcan, CAN_FIFO0) != HAL_OK)
