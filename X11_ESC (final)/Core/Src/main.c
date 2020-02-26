@@ -69,7 +69,11 @@ int adc_val [4] = {0}; //stores the adc values from all 4 adc channels
 float MAX_VOLT = 3.3; //maximum voltage value for adc conversion
 float WANTED_VOLT = 1.5; //target voltage value for which the current is too high
 int spoof_ar [4] = {0, 127, 255, 200}; //a spoof array for testing pwm without CAN
-int max_change;
+int change1;
+int change2;
+int change3;
+int change4;
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -491,15 +495,26 @@ void ramp_power(){
 		TIM3->CCR4 = byte_to_pwm((int)data[4]); //U3
 	}
 	else{
-		__HAL_TIM_SET_AUTORELOAD(&htim14, data[1] * 10 - 1);
-		max_change = data[2];
+		__HAL_TIM_SET_AUTORELOAD(&htim14, data[1] - 1);
+		change1 = ((int)data[7] - TIM3->CCR1) / (10);
+		change2 = ((int)data[6] - TIM3->CCR2) / (10);
+		change3 = ((int)data[5] - TIM3->CCR3) / (10);
+		change4 = ((int)data[4] - TIM3->CCR4) / (10);
 
 		HAL_TIM_Base_Start(&htim14);
+
 		}
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef * htim){
+	TIM3->CCR1 = byte_to_pwm(TIM3->CCR1 + change1);
+	TIM3->CCR2 = byte_to_pwm(TIM3->CCR2 + change2);
+	TIM3->CCR3 = byte_to_pwm(TIM3->CCR3 + change3);
+	TIM3->CCR4 = byte_to_pwm(TIM3->CCR4 + change4);
 
+	if((int)data[7] == TIM3->CCR1){
+		HAL_TIM_Base_Stop(&htim14);
+	}
 }
 
 void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
