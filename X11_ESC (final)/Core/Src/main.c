@@ -73,7 +73,7 @@ int change1;
 int change2;
 int change3;
 int change4;
-
+int desired;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -487,20 +487,20 @@ int byte_to_pwm(int byte)
 	return (exact + 0.5); //rounds up the integer by adding 0.5
 }
 
-void ramp_power(){
-	if (!data[0]){
-		TIM3->CCR1 = byte_to_pwm((int)data[7]); //U7
-		TIM3->CCR2 = byte_to_pwm((int)data[6]); //U2
-		TIM3->CCR3 = byte_to_pwm((int)data[5]); //U1
-		TIM3->CCR4 = byte_to_pwm((int)data[4]); //U3
+void ramp_power(CAN_HandleTypeDef* hcan){
+	if (!hcan->pRxMsg->Data[0]){
+		TIM3->CCR1 = byte_to_pwm((int)hcan->pRxMsg->Data[7]); //U7
+		TIM3->CCR2 = byte_to_pwm((int)hcan->pRxMsg->Data[6]); //U2
+		TIM3->CCR3 = byte_to_pwm((int)hcan->pRxMsg->Data[5]); //U1
+		TIM3->CCR4 = byte_to_pwm((int)hcan->pRxMsg->Data[4]); //U3
 	}
 	else{
-		__HAL_TIM_SET_AUTORELOAD(&htim14, data[1] - 1);
-		change1 = ((int)data[7] - TIM3->CCR1) / (10);
-		change2 = ((int)data[6] - TIM3->CCR2) / (10);
-		change3 = ((int)data[5] - TIM3->CCR3) / (10);
-		change4 = ((int)data[4] - TIM3->CCR4) / (10);
-
+		__HAL_TIM_SET_AUTORELOAD(&htim14, hcan->pRxMsg->Data[1] - 1);
+		change1 = ((int)hcan->pRxMsg->Data[7] - TIM3->CCR1) / (10);
+		change2 = ((int)hcan->pRxMsg->Data[6] - TIM3->CCR2) / (10);
+		change3 = ((int)hcan->pRxMsg->Data[5] - TIM3->CCR3) / (10);
+		change4 = ((int)hcan->pRxMsg->Data[4] - TIM3->CCR4) / (10);
+		desired = (int)hcan->pRxMsg->Data[7];
 		HAL_TIM_Base_Start(&htim14);
 
 		}
@@ -512,7 +512,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef * htim){
 	TIM3->CCR3 = byte_to_pwm(TIM3->CCR3 + change3);
 	TIM3->CCR4 = byte_to_pwm(TIM3->CCR4 + change4);
 
-	if((int)data[7] == TIM3->CCR1){
+	if(desired == TIM3->CCR1){
 		HAL_TIM_Base_Stop(&htim14);
 	}
 }
@@ -523,11 +523,11 @@ void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 	//If ID is correct and the amount of data being sent is four bytes, converts that data into PWM signals
 	if((hcan->pRxMsg->StdId == 0x202))
 	{
-		//ramp_power();
-		TIM3->CCR1 = byte_to_pwm((int)data[7]); //U7
-		TIM3->CCR2 = byte_to_pwm((int)data[6]); //U2
-		TIM3->CCR3 = byte_to_pwm((int)data[5]); //U1
-		TIM3->CCR4 = byte_to_pwm((int)data[4]); //U3
+		ramp_power(hcan);
+		/*TIM3->CCR1 = byte_to_pwm((int)hcan->pRxMsg->Data[7]); //U7
+		TIM3->CCR2 = byte_to_pwm((int)hcan->pRxMsg->Data[6]); //U2
+		TIM3->CCR3 = byte_to_pwm((int)hcan->pRxMsg->Data[5]); //U1
+		TIM3->CCR4 = byte_to_pwm((int)hcan->pRxMsg->Data[4]); //U3*/
 	}
   //necessary portion that restarts the CAN receiving
 	if (HAL_CAN_Receive_IT(hcan, CAN_FIFO0) != HAL_OK)
