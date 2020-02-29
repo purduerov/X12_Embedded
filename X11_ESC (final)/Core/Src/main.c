@@ -523,7 +523,11 @@ void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 	//If ID is correct and the amount of data being sent is four bytes, converts that data into PWM signals
 	if((hcan->pRxMsg->StdId == 0x202))
 	{
-		ramp_power();
+		//ramp_power();
+		TIM3->CCR1 = byte_to_pwm((int)data[7]); //U7
+		TIM3->CCR2 = byte_to_pwm((int)data[6]); //U2
+		TIM3->CCR3 = byte_to_pwm((int)data[5]); //U1
+		TIM3->CCR4 = byte_to_pwm((int)data[4]); //U3
 	}
   //necessary portion that restarts the CAN receiving
 	if (HAL_CAN_Receive_IT(hcan, CAN_FIFO0) != HAL_OK)
