@@ -81,7 +81,7 @@ static void MX_TIM3_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+unsigned char sol_byte = 0;
 /* USER CODE END 0 */
 
 /**
@@ -116,6 +116,7 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim3);
+  reset_solenoids();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -312,76 +313,55 @@ void reset_solenoids(){
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
 }
 
-void Set_solenoid(int solenoid, char flow){
+void Set_solenoid(unsigned char sol_byte){
 	reset_solenoids();
-	GPIO_TypeDef*	in1_gpio;
-	GPIO_TypeDef*	in2_gpio;
-	uint16_t		in1_pin;
-	uint16_t		in2_pin;
 
-	if(solenoid == 1){
-		in1_gpio = GPIOB;
-		in2_gpio = GPIOB;
-		in1_pin = GPIO_PIN_3;
-		in2_pin = GPIO_PIN_4;
+	if((sol_byte & 0x80) == 0x80)
+	{
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET); //GPIO 0 SET
 	}
-	else if(solenoid == 2){
-		in1_gpio = GPIOB;
-		in2_gpio = GPIOB;
-		in1_pin = GPIO_PIN_6;
-		in2_pin = GPIO_PIN_7;
+	if((sol_byte & 0x40) == 0x40)
+	{
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET); //GPIO 1 SET
 	}
-	else if(solenoid == 3){
-		in1_gpio = GPIOA;
-		in2_gpio = GPIOA;
-		in1_pin = GPIO_PIN_3;
-		in2_pin = GPIO_PIN_4;
+	if((sol_byte & 0x20) == 0x20)
+	{
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET); //GPIO 2 SET
 	}
-	else if(solenoid == 4){
-		in1_gpio = GPIOA;
-		in2_gpio = GPIOA;
-		in1_pin = GPIO_PIN_5;
-		in2_pin = GPIO_PIN_6;
+	if((sol_byte & 0x10) == 0x10)
+	{
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); //GPIO 3 SET
 	}
-	else if(solenoid == 5){
-		in1_gpio = GPIOA;
-		in2_gpio = GPIOA;
-		in1_pin = GPIO_PIN_7;
-		in2_pin = GPIO_PIN_8;
+	if((sol_byte & 0x08) == 0x08)
+	{
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET); //GPIO 4 SET
 	}
-	else if(solenoid == 6){
-		in1_gpio = GPIOA;
-		in2_gpio = GPIOA;
-		in1_pin = GPIO_PIN_9;
-		in2_pin = GPIO_PIN_10;
-	}
-	else{
-		return;
+	if((sol_byte & 0x04) == 0x04)
+	{
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET); //GPIO 5 SET
 	}
 
-	switch(flow){
-		case 'f':
-			HAL_GPIO_WritePin(in1_gpio, in1_pin, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(in2_gpio, in2_pin, GPIO_PIN_RESET);
-			break;
-		case 'r':
-			HAL_GPIO_WritePin(in1_gpio, in1_pin, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(in2_gpio, in2_pin, GPIO_PIN_SET);
-			break;
-		case 'b':
-			HAL_GPIO_WritePin(in1_gpio, in1_pin, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(in2_gpio, in2_pin, GPIO_PIN_SET);
-			break;
-		case 's':
-			HAL_GPIO_WritePin(in1_gpio, in1_pin, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(in2_gpio, in2_pin, GPIO_PIN_RESET);
-			break;
-	}
 }
 
 //This is the callback function called when Tim3 counter reaches ARR(Period)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_15);
+	//HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_15);
+}
+
+void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
+{
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
+	//If ID is correct and the amount of data being sent is four bytes, converts that data into PWM signals
+	if((hcan->pRxMsg->StdId == 0x204))
+	{
+		sol_byte = hcan->pRxMsg->Data[7];
+		Set_solenoid(sol_byte);
+	}
+  //necessary portion that restarts the CAN receiving
+	if (HAL_CAN_Receive_IT(hcan, CAN_FIFO0) != HAL_OK)
+	{
+		Error_Handler();
+	}
 }
 /* USER CODE END 4 */
 
