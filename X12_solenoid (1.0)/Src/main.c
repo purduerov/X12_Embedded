@@ -76,7 +76,7 @@ static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
 static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
-
+void reset_solenoids();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -117,6 +117,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim3);
   reset_solenoids();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -318,27 +319,27 @@ void Set_solenoid(unsigned char sol_byte){
 
 	if((sol_byte & 0x80) == 0x80)
 	{
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET); //GPIO 0 SET
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET); //Solenoid 1 SET
 	}
 	if((sol_byte & 0x40) == 0x40)
 	{
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET); //GPIO 1 SET
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET); //Solenoid 2 SET
 	}
 	if((sol_byte & 0x20) == 0x20)
 	{
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET); //GPIO 2 SET
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET); //Solenoid 3 SET
 	}
 	if((sol_byte & 0x10) == 0x10)
 	{
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); //GPIO 3 SET
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); //Solenoid 4 SET
 	}
 	if((sol_byte & 0x08) == 0x08)
 	{
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET); //GPIO 4 SET
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET); //Solenoid 5 SET
 	}
 	if((sol_byte & 0x04) == 0x04)
 	{
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET); //GPIO 5 SET
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET); //Solenoid 6 SET
 	}
 
 }
