@@ -245,11 +245,28 @@ static void MX_CAN_Init(void)
 
 }
 
+#define NUM_SOLENOIDS 2
+
+#define NUM_SOLENOID_PINS 2
+#define IN_1 0
+#define IN_2 1
+
+uint16_t solenoids[NUM_SOLENOIDS][NUM_SOLENOID_PINS];
+
+static void defineSolenoidPinout()
+{
+	solenoids[0][IN_1] = GPIO_PIN_3;
+	solenoids[0][IN_2] = GPIO_PIN_4;
+	solenoids[1][IN_1] = GPIO_PIN_6;
+	solenoids[1][IN_2] = GPIO_PIN_7;
+}
+
 /**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
   */
+
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -259,14 +276,21 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_15, GPIO_PIN_RESET);
+  /*HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_15, GPIO_PIN_RESET); */
+  //  Reset LED Pin Output
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6 
-                          |GPIO_PIN_7, GPIO_PIN_RESET);
+  /* HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
+                          |GPIO_PIN_7, GPIO_PIN_RESET); */
+
+  defineSolenoidPinout();
+  HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_1] | solenoids[0][IN_2] |
+		  solenoids[1][IN_1] | solenoids[1][IN_2]);
 
   /*Configure GPIO pins : PA0 PA1 PA2 PA15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_15;
+  //  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_15;
+  GPIO_InitStruct.Pin = GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -274,8 +298,10 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pins : PB3 PB4 PB5 PB6 
                            PB7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6 
-                          |GPIO_PIN_7;
+  /*GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
+                          |GPIO_PIN_7; */
+  GPIO_InitStruct.Pin = solenoids[0][IN_1] | solenoids[0][IN_2] |
+		  solenoids[1][IN_1] | solenoids[1][IN_2];
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -309,46 +335,58 @@ void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 			//do nothing since this cant happen
 		}
 		*/
-				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET); //GPIO 0 RESET
-				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET); //GPIO 1 RESET
-				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); //GPIO 2 RESET
-				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET); //GPIO 3 RESET
-				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET); //GPIO 4 RESET
-				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); //GPIO 5 RESET
-				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET); //GPIO 6 RESET
-				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET); //GPIO 7 RESET
-				if((sol_byte & 0x80) == 0x80)
-				{
-					HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET); //GPIO 0 SET
-				}
-				if((sol_byte & 0x40) == 0x40)
-				{
-					HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET); //GPIO 1 SET
-				}
-				if((sol_byte & 0x20) == 0x20)
-				{
-					HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET); //GPIO 2 SET
-				}
-				if((sol_byte & 0x10) == 0x10)
-				{
-					HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET); //GPIO 3 SET
-				}
-				if((sol_byte & 0x08) == 0x08)
-				{
-					HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET); //GPIO 4 SET
-				}
-				if((sol_byte & 0x04) == 0x04)
-				{
-					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET); //GPIO 5 SET
-				}
-				if((sol_byte & 0x02) == 0x02)
-				{
-					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET); //GPIO 6 SET
-				}
-				if((sol_byte & 0x01) == 0x01)
-				{
-					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET); //GPIO 7 SET
-				}
+		/*HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET); //GPIO 0 RESET
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET); //GPIO 1 RESET
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); //GPIO 2 RESET
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET); //GPIO 3 RESET
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET); //GPIO 4 RESET
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); //GPIO 5 RESET
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET); //GPIO 6 RESET
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET); //GPIO 7 RESET */
+
+		HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_1], GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_2], GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, solenoids[1][IN_1], GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, solenoids[1][IN_2], GPIO_PIN_RESET);
+
+		/*if((sol_byte & 0x80) == 0x80)
+		{
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET); //GPIO 0 SET
+		}
+		if((sol_byte & 0x40) == 0x40)
+		{
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET); //GPIO 1 SET
+		}
+		if((sol_byte & 0x20) == 0x20)
+		{
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET); //GPIO 2 SET
+		}
+		if((sol_byte & 0x10) == 0x10)
+		{
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET); //GPIO 3 SET
+		} */
+
+
+		if((sol_byte & 0x08) == 0x08)
+		{
+			// HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET); //GPIO 4 SET
+			HAL_GPIO_WritePin(GPIOB, solenoids[1][IN_1], GPIO_PIN_SET); //GPIO 4 SET
+		}
+		if((sol_byte & 0x04) == 0x04)
+		{
+			// HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET); //GPIO 5 SET
+			HAL_GPIO_WritePin(GPIOB, solenoids[1][IN_2], GPIO_PIN_SET); //GPIO 4 SET
+		}
+		if((sol_byte & 0x02) == 0x02)
+		{
+			// HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET); //GPIO 6 SET
+			HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_1], GPIO_PIN_SET); //GPIO 4 SET
+		}
+		if((sol_byte & 0x01) == 0x01)
+		{
+			// HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET); //GPIO 7 SET
+			HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_2], GPIO_PIN_SET); //GPIO 4 SET
+		}
 
 	}
   //necessary portion that restarts the CAN receiving
