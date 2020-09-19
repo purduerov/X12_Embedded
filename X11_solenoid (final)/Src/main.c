@@ -197,6 +197,8 @@ static void MX_CAN_Init(void)
 
   /* USER CODE BEGIN CAN_Init 1 */
 
+	__HAL_RCC_CAN1_CLK_ENABLE();
+
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN;
   hcan.Init.Prescaler = 4;
@@ -261,6 +263,10 @@ static void defineSolenoidPinout()
 	solenoids[1][IN_2] = GPIO_PIN_7;
 }
 
+//  Port A GPIO
+#define CAN_TX_PIN GPIO_PIN_12
+#define CAN_RX_PIN GPIO_PIN_11
+
 /**
   * @brief GPIO Initialization Function
   * @param None
@@ -278,15 +284,19 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   /*HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_15, GPIO_PIN_RESET); */
   //  Reset LED Pin Output
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15);
+  HAL_GPIO_WritePin(GPIOA,
+		  GPIO_PIN_15,
+		  GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   /* HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
                           |GPIO_PIN_7, GPIO_PIN_RESET); */
 
   defineSolenoidPinout();
-  HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_1] | solenoids[0][IN_2] |
-		  solenoids[1][IN_1] | solenoids[1][IN_2]);
+  HAL_GPIO_WritePin(GPIOB,
+		  solenoids[0][IN_1] | solenoids[0][IN_2] |
+		  solenoids[1][IN_1] | solenoids[1][IN_2],
+		  GPIO_PIN_RESET);
 
   /*Configure GPIO pins : PA0 PA1 PA2 PA15 */
   //  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_15;
@@ -295,6 +305,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  //  Configure CAN Pins Alternate Function
+  uint32_t CAN_AF = 0x4;
+  GPIO_TypeDef* gpioA = GPIOA;
+  gpioA->AFR[1] &= ~GPIO_AFRH_AFSEL11_Msk;
+  gpioA->AFR[1] |= (CAN_AF << GPIO_AFRH_AFSEL11_Pos);
+  gpioA->AFR[1] &= ~GPIO_AFRH_AFSEL12_Msk;
+  gpioA->AFR[1] |= (CAN_AF << GPIO_AFRH_AFSEL12_Pos);
 
   /*Configure GPIO pins : PB3 PB4 PB5 PB6 
                            PB7 */
@@ -306,6 +324,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  HAL_GPIO_WritePin(GPIOA,
+		  GPIO_PIN_15,
+		  GPIO_PIN_SET);
 
 }
 
@@ -405,10 +427,25 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
+	// GPIO_PinState pinState = GPIO_PIN_RESET;
 	while(1)
 	{
 	    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_15);
-	    nano_wait(10000000);
+	    nano_wait(100000000);
+
+
+		/*HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_1], pinState);
+		HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_2], GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, solenoids[1][IN_1], pinState);
+		HAL_GPIO_WritePin(GPIOB, solenoids[1][IN_2], GPIO_PIN_RESET);
+		if (pinState == GPIO_PIN_RESET)
+		{
+			pinState = GPIO_PIN_SET;
+		}
+		else
+		{
+			pinState = GPIO_PIN_RESET;
+		} */
 	}
   /* USER CODE END Error_Handler_Debug */
 }
