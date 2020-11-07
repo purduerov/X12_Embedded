@@ -154,6 +154,7 @@ static void MX_CAN_Init(void)
 	// 	HAL_CAN_MspInit() defined in Core/Src/stm32f0xx_hal_msp.c
 	//  Enables GPIO Pins PA11 and PA12 for CAN RX and TX, respectively
 	// 	Enables CAN Peripheral CLK
+	//  Enables CAN Interrupt through NVIC
 
 	//  Generated Code
 	hcan.Instance = CAN;
@@ -209,6 +210,26 @@ static void MX_CAN_Init(void)
 		Error_Handler();
 	}
 
+	//  Enable CAN FIFO RX Pending Interrupt
+	if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	HAL_CAN_RegisterCallback(&hcan, HAL_CAN_RX_FIFO0_MSG_PENDING_CB_ID, CAN_ReceiveMessageCallback);
+
+
+}
+
+void CAN_ReceiveMessageCallback(CAN_HandleTypeDef *hcan)
+{
+	CAN_RxHeaderTypeDef canPacketHeader;
+	uint8_t canPacketData[8];
+
+	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &canPacketHeader, canPacketData) != HAL_OK)
+	{
+		Error_Handler();
+	}
 }
 
 /**

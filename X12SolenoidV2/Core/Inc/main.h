@@ -55,6 +55,8 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+void CAN_ReceiveMessageCallback(CAN_HandleTypeDef *hcan);
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

@@ -21,6 +21,8 @@
 #ifndef STM32F0xx_HAL_CAN_H
 #define STM32F0xx_HAL_CAN_H
 
+#define USE_HAL_CAN_REGISTER_CALLBACKS 1
+
 #ifdef __cplusplus
 extern "C" {
 #endif
