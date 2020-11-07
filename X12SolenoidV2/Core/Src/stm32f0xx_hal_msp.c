@@ -107,6 +107,7 @@ void HAL_CAN_MspInit(CAN_HandleTypeDef* hcan)
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN CAN_MspInit 1 */
+    HAL_NVIC_EnableIRQ(CEC_CAN_IRQn);
 
   /* USER CODE END CAN_MspInit 1 */
   }
