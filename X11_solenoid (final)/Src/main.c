@@ -126,7 +126,7 @@ int main(void)
   {
 	  Error_Handler();
   }
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
+  // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -146,6 +146,7 @@ int main(void)
 			  }
 			  check_error = 0;
 		}
+
   }
   /* USER CODE END 3 */
 }
@@ -247,26 +248,6 @@ static void MX_CAN_Init(void)
 
 }
 
-#define NUM_SOLENOIDS 2
-
-#define NUM_SOLENOID_PINS 2
-#define IN_1 0
-#define IN_2 1
-
-uint16_t solenoids[NUM_SOLENOIDS][NUM_SOLENOID_PINS];
-
-static void defineSolenoidPinout()
-{
-	solenoids[0][IN_1] = GPIO_PIN_3;
-	solenoids[0][IN_2] = GPIO_PIN_4;
-	solenoids[1][IN_1] = GPIO_PIN_6;
-	solenoids[1][IN_2] = GPIO_PIN_7;
-}
-
-//  Port A GPIO
-#define CAN_TX_PIN GPIO_PIN_12
-#define CAN_RX_PIN GPIO_PIN_11
-
 /**
   * @brief GPIO Initialization Function
   * @param None
@@ -282,49 +263,35 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  /*HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_15, GPIO_PIN_RESET); */
-  //  Reset LED Pin Output
   HAL_GPIO_WritePin(GPIOA,
+		  GPIO_PIN_5 |
+		  GPIO_PIN_6 |
+		  GPIO_PIN_7 |
 		  GPIO_PIN_15,
 		  GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  /* HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
-                          |GPIO_PIN_7, GPIO_PIN_RESET); */
-
-  defineSolenoidPinout();
   HAL_GPIO_WritePin(GPIOB,
-		  solenoids[0][IN_1] | solenoids[0][IN_2] |
-		  solenoids[1][IN_1] | solenoids[1][IN_2],
+		  GPIO_PIN_3 |
+		  GPIO_PIN_4 |
+		  GPIO_PIN_6,
 		  GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PA0 PA1 PA2 PA15 */
-  //  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_15;
-  GPIO_InitStruct.Pin = GPIO_PIN_15;
+  //  Configure GPIOA GPIO pins
+  GPIO_InitStruct.Pin = GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  //  Configure CAN Pins Alternate Function
-  uint32_t CAN_AF = 0x4;
-  GPIO_TypeDef* gpioA = GPIOA;
-  gpioA->AFR[1] &= ~GPIO_AFRH_AFSEL11_Msk;
-  gpioA->AFR[1] |= (CAN_AF << GPIO_AFRH_AFSEL11_Pos);
-  gpioA->AFR[1] &= ~GPIO_AFRH_AFSEL12_Msk;
-  gpioA->AFR[1] |= (CAN_AF << GPIO_AFRH_AFSEL12_Pos);
-
-  /*Configure GPIO pins : PB3 PB4 PB5 PB6 
-                           PB7 */
-  /*GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
-                          |GPIO_PIN_7; */
-  GPIO_InitStruct.Pin = solenoids[0][IN_1] | solenoids[0][IN_2] |
-		  solenoids[1][IN_1] | solenoids[1][IN_2];
+  // Configure GPIOB GPIO pins
+  GPIO_InitStruct.Pin = GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_6;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  //  Turn on LED
   HAL_GPIO_WritePin(GPIOA,
 		  GPIO_PIN_15,
 		  GPIO_PIN_SET);
@@ -339,75 +306,65 @@ void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 	if((hcan->pRxMsg->StdId == 0x204))
 	{
 		sol_byte = hcan->pRxMsg->Data[7];
-		/*
-		if((sol_byte & 0x01) == ((sol_byte>>4) & 0x01))
-		{
-			//do nothing since this cant happen
-		}
-		else if(((sol_byte>>1) & 0x01) == ((sol_byte>>5) & 0x01))
-		{
-			//do nothing since this cant happen
-		}
-		else if(((sol_byte>>2) & 0x01) == ((sol_byte>>6) & 0x01))
-		{
-			//do nothing since this cant happen
-		}
-		else if(((sol_byte>>3) & 0x01) == ((sol_byte>>7) & 0x01))
-		{
-			//do nothing since this cant happen
-		}
-		*/
-		/*HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET); //GPIO 0 RESET
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET); //GPIO 1 RESET
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); //GPIO 2 RESET
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET); //GPIO 3 RESET
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET); //GPIO 4 RESET
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); //GPIO 5 RESET
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET); //GPIO 6 RESET
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET); //GPIO 7 RESET */
 
-		HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_1], GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_2], GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, solenoids[1][IN_1], GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, solenoids[1][IN_2], GPIO_PIN_RESET);
-
-		/*if((sol_byte & 0x80) == 0x80)
-		{
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET); //GPIO 0 SET
-		}
-		if((sol_byte & 0x40) == 0x40)
-		{
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET); //GPIO 1 SET
-		}
+		//  Solenoid 6
 		if((sol_byte & 0x20) == 0x20)
 		{
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET); //GPIO 2 SET
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET);
 		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET);
+		}
+
+		//  Solenoid 5
 		if((sol_byte & 0x10) == 0x10)
 		{
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET); //GPIO 3 SET
-		} */
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
+		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
+		}
 
-
+		//  Solenoid 4
 		if((sol_byte & 0x08) == 0x08)
 		{
-			// HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET); //GPIO 4 SET
-			HAL_GPIO_WritePin(GPIOB, solenoids[1][IN_1], GPIO_PIN_SET); //GPIO 4 SET
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
 		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+		}
+
+		//  Solenoid 3
 		if((sol_byte & 0x04) == 0x04)
 		{
-			// HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET); //GPIO 5 SET
-			HAL_GPIO_WritePin(GPIOB, solenoids[1][IN_2], GPIO_PIN_SET); //GPIO 4 SET
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
 		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+		}
+
+		//  Solenoid 2
 		if((sol_byte & 0x02) == 0x02)
 		{
-			// HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET); //GPIO 6 SET
-			HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_1], GPIO_PIN_SET); //GPIO 4 SET
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
 		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
+		}
+
+		//  Solenoid 1
 		if((sol_byte & 0x01) == 0x01)
 		{
-			// HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET); //GPIO 7 SET
-			HAL_GPIO_WritePin(GPIOB, solenoids[0][IN_2], GPIO_PIN_SET); //GPIO 4 SET
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);
+		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
 		}
 
 	}
