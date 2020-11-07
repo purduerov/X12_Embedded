@@ -14,7 +14,7 @@
 typedef enum SolenoidErrorCodeEnum
 {
 	SOLENOID_SUCCESS = 0,
-	SOLENOID_INVALID_SOLENOID_NUMBER = 1,
+	SOLENOID_INVALID_SOLENOID_INDEX = 1,
 	SOLENOID_INVALID_GPIO_PORT = 2,
 	SOLENOID_INVALID_GPIO_PIN = 3,
 	SOLENOID_INVALID_NUMBER_OF_SOLENOIDS = 4
@@ -27,11 +27,19 @@ typedef struct SolenoidStruct
 } Solenoid;
 
 //  Function Declarations
-SolenoidErrorCode verifySolenoidNumber(int solenoidNumber);
+SolenoidErrorCode verifySolenoidIndex(int solenoidIndex);
+SolenoidErrorCode verifyNumberOfSolenoids(int numSolenoids);
+void configureNumberOfSolenoids(int numSolenoids);
 
-SolenoidErrorCode addSolenoid(int solenoidNumber, GPIO_TypeDef* gpioPort, uint16_t gpioPin);
+SolenoidErrorCode addSolenoid(int solenoidIndex, GPIO_TypeDef* gpioPort, uint16_t gpioPin);
 SolenoidErrorCode addSolenoids(int numberOfSolenoids, int* solenoidNumber, GPIO_TypeDef** gpioPorts, uint16_t* gpioPins);
-SolenoidErrorCode configureSolenoid(int solenoidNumber, GPIO_InitTypeDef* gpioInit);
+void configureSolenoid(int solenoidIndex, GPIO_InitTypeDef* gpioInit);
+void configureSolenoids(GPIO_InitTypeDef* gpioInit);
+
+void enableSolenoid(int solenoidIndex);
+void enableSolenoids();
+void disableSolenoid(int solenoidIndex);
+void disableSolenoids();
 
 
 #endif /* INC_SOLENOID_H_ */
