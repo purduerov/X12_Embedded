@@ -19,6 +19,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "solenoid.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -32,6 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define NUM_SOLENOIDS 6
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -41,6 +43,11 @@
 
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan;
+
+//  Establish Pins used for solenoids
+int solenoidIndices[NUM_SOLENOIDS] = {0, 1, 2, 3, 4, 5};
+GPIO_TypeDef* gpioPorts[NUM_SOLENOIDS] = {GPIOA, GPIOA, GPIOA, GPIOB, GPIOB, GPIOB};
+uint16_t gpioPins[NUM_SOLENOIDS] = {GPIO_PIN_7, GPIO_PIN_6, GPIO_PIN_5, GPIO_PIN_6, GPIO_PIN_4, GPIO_PIN_3};
 
 /* USER CODE BEGIN PV */
 
@@ -217,8 +224,6 @@ static void MX_CAN_Init(void)
 	}
 
 	HAL_CAN_RegisterCallback(&hcan, HAL_CAN_RX_FIFO0_MSG_PENDING_CB_ID, CAN_ReceiveMessageCallback);
-
-
 }
 
 void CAN_ReceiveMessageCallback(CAN_HandleTypeDef *hcan)
@@ -229,6 +234,21 @@ void CAN_ReceiveMessageCallback(CAN_HandleTypeDef *hcan)
 	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &canPacketHeader, canPacketData) != HAL_OK)
 	{
 		Error_Handler();
+	}
+
+	uint8_t solenoidData = canPacketData[7];
+	for (int solenoidIndex = 0; solenoidIndex < NUM_SOLENOIDS; solenoidIndex++)
+	{
+		//  Enable Solenoid
+		if ((solenoidData & (1 << solenoidIndex)) != 0)
+		{
+			enableSolenoid(solenoidIndex);
+		}
+		//  Disable Solenoid
+		else
+		{
+			disableSolenoid(solenoidIndex);
+		}
 	}
 }
 
@@ -245,26 +265,50 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_6, GPIO_PIN_RESET);
-
-  /*Configure GPIO pins : PA5 PA6 PA7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
+  //  Configure GPIO for LED
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
+  GPIO_InitStruct.Pin = GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB3 PB4 PB6 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_6;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  SolenoidInit();
+}
 
+SolenoidErrorCode SolenoidInit()
+{
+	SolenoidErrorCode errorCode;
+
+	//  Set configuration settings for solenoid GPIO Pins
+	GPIO_InitTypeDef gpioInit;
+	gpioInit.Mode = GPIO_MODE_OUTPUT_PP;
+	gpioInit.Pull = GPIO_NOPULL;
+	gpioInit.Speed = GPIO_SPEED_FREQ_LOW;
+
+	//  Verify and configure number of solenoids
+	errorCode = verifyNumberOfSolenoids(NUM_SOLENOIDS);
+	if (errorCode != SOLENOID_SUCCESS)
+	{
+		return errorCode;
+	}
+	configureNumberOfSolenoids(NUM_SOLENOIDS);
+
+	//  Verify solenoids indices
+	for (int i = 0; i < NUM_SOLENOIDS; i++)
+	{
+		errorCode = verifySolenoidIndex(solenoidIndices[i]);
+		if (errorCode != SOLENOID_SUCCESS)
+		{
+			return errorCode;
+		}
+	}
+
+	addSolenoids(NUM_SOLENOIDS, solenoidIndices, gpioPorts, gpioPins);
+	configureSolenoids(&gpioInit);
+	disableSolenoids();
+
+	return SOLENOID_SUCCESS;
 }
 
 /* USER CODE BEGIN 4 */

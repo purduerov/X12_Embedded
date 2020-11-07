@@ -29,6 +29,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f0xx_hal.h"
+#include "solenoid.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -55,6 +56,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+SolenoidErrorCode SolenoidInit();
 void CAN_ReceiveMessageCallback(CAN_HandleTypeDef *hcan);
 
 /* USER CODE END EFP */

@@ -11,16 +11,34 @@
 
 Solenoid solenoidArray[NUM_SOLENOIDS];
 
-SolenoidErrorCode addSolenoid(int solenoidNumber, GPIO_TypeDef* gpioPort, uint16_t gpioPin)
-{
-	SolenoidErrorCode errorCode;
+int configuredNumberOfSolenoids;
 
-	//  Check Parameters
-	errorCode = verifySolenoidNumber(solenoidNumber);
-	if (errorCode != SOLENOID_SUCCESS)
+SolenoidErrorCode verifySolenoidIndex(int solenoidIndex)
+{
+	if (solenoidIndex >= NUM_SOLENOIDS || solenoidIndex < 0)
 	{
-		return errorCode;
+		return SOLENOID_INVALID_SOLENOID_INDEX;
 	}
+	return SOLENOID_SUCCESS;
+}
+
+SolenoidErrorCode verifyNumberOfSolenoids(int numSolenoids)
+{
+	if (numSolenoids > NUM_SOLENOIDS || numSolenoids < 0)
+	{
+		return SOLENOID_INVALID_NUMBER_OF_SOLENOIDS;
+	}
+	return SOLENOID_SUCCESS;
+}
+
+void configureNumberOfSolenoids(int numSolenoids)
+{
+	configuredNumberOfSolenoids = numSolenoids;
+}
+
+SolenoidErrorCode addSolenoid(int solenoidIndex, GPIO_TypeDef* gpioPort, uint16_t gpioPin)
+{
+	//  Check Parameters
 	if (gpioPort == NULL)
 	{
 		return SOLENOID_INVALID_GPIO_PORT;
@@ -30,25 +48,19 @@ SolenoidErrorCode addSolenoid(int solenoidNumber, GPIO_TypeDef* gpioPort, uint16
 		return SOLENOID_INVALID_GPIO_PIN;
 	}
 
-	solenoidArray[solenoidNumber].port = gpioPort;
-	solenoidArray[solenoidNumber].pin = gpioPin;
+	solenoidArray[solenoidIndex].port = gpioPort;
+	solenoidArray[solenoidIndex].pin = gpioPin;
 
 	return SOLENOID_SUCCESS;
 }
 
-SolenoidErrorCode addSolenoids(int numberOfSolenoids, int* solenoidNumber, GPIO_TypeDef** gpioPorts, uint16_t* gpioPins)
+SolenoidErrorCode addSolenoids(int numberOfSolenoids, int* solenoidIndices, GPIO_TypeDef** gpioPorts, uint16_t* gpioPins)
 {
 	SolenoidErrorCode errorCode;
 
-	//  Check parameters
-	if (numberOfSolenoids > NUM_SOLENOIDS || numberOfSolenoids < 0)
-	{
-		return SOLENOID_INVALID_NUMBER_OF_SOLENOIDS;
-	}
-
 	for (int i = 0; i < numberOfSolenoids; i++)
 	{
-		errorCode = addSolenoid(solenoidNumber[i], gpioPorts[i], gpioPins[i]);
+		errorCode = addSolenoid(solenoidIndices[i], gpioPorts[i], gpioPins[i]);
 		if (errorCode != SOLENOID_SUCCESS)
 		{
 			return errorCode;
@@ -58,38 +70,49 @@ SolenoidErrorCode addSolenoids(int numberOfSolenoids, int* solenoidNumber, GPIO_
 	return SOLENOID_SUCCESS;
 }
 
-SolenoidErrorCode verifySolenoidNumber(int solenoidNumber)
+void configureSolenoid(int solenoidIndex, GPIO_InitTypeDef* gpioInit)
 {
-	if (solenoidNumber >= NUM_SOLENOIDS || solenoidNumber < 0)
+	//  Disable Pin associated with Solenoid
+	disableSolenoid(solenoidIndex);
+
+	//  Override gpioInit->Pin with GPIO Pin of selected solenoid
+	gpioInit->Pin = solenoidArray[solenoidIndex].pin;
+
+	//  Initialize GPIO Pin for selected solenoid
+	HAL_GPIO_Init(solenoidArray[solenoidIndex].port, gpioInit);
+}
+
+void configureSolenoids(GPIO_InitTypeDef* gpioInit)
+{
+	for (int i = 0; i < configuredNumberOfSolenoids; i++)
 	{
-		return SOLENOID_INVALID_SOLENOID_NUMBER;
-	}
-	else
-	{
-		return SOLENOID_SUCCESS;
+		configureSolenoid(i, gpioInit);
 	}
 }
 
-SolenoidErrorCode configureSolenoid(int solenoidNumber, GPIO_InitTypeDef* gpioInit)
+void enableSolenoid(int solenoidIndex)
 {
-	SolenoidErrorCode errorCode;
+	HAL_GPIO_WritePin(solenoidArray[solenoidIndex].port, solenoidArray[solenoidIndex].pin, GPIO_PIN_SET);
+}
 
-	//  Check parameter
-	errorCode = verifySolenoidNumber(solenoidNumber);
-	if (errorCode != SOLENOID_SUCCESS)
+void enableSolenoids()
+{
+	for (int i = 0; i < configuredNumberOfSolenoids; i++)
 	{
-		return errorCode;
+		enableSolenoid(i);
 	}
+}
 
-	//  Set Output of Pin to be Logic LOW
-	HAL_GPIO_WritePin(solenoidArray[solenoidNumber].port, solenoidArray[solenoidNumber].pin, GPIO_PIN_RESET);
+void disableSolenoid(int solenoidIndex)
+{
+	HAL_GPIO_WritePin(solenoidArray[solenoidIndex].port, solenoidArray[solenoidIndex].pin, GPIO_PIN_RESET);
+}
 
-	//  Override gpioInit->Pin with GPIO Pin of selected solenoid
-	gpioInit->Pin = solenoidArray[solenoidNumber].pin;
-
-	//  Initialize GPIO Pin for selected solenoid
-	HAL_GPIO_Init(solenoidArray[solenoidNumber].port, gpioInit);
-
-	return SOLENOID_SUCCESS;
+void disableSolenoids()
+{
+	for (int i = 0; i < configuredNumberOfSolenoids; i++)
+	{
+		disableSolenoid(i);
+	}
 }
 
