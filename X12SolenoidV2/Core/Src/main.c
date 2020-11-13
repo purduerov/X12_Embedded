@@ -34,6 +34,17 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define NUM_SOLENOIDS 6
+
+#define SOLENOID_BOARD_CAN_STANDARD_ID 0x204  //  11 bits
+#define SOLENOID_BOARD_CAN_EXTENDED_ID 0x00000  //  18 bits
+#define SOLENOID_BOARD_CAN_IDE CAN_ID_STD
+#define SOLENOID_BOARD_CAN_RTR CAN_RTR_DATA
+
+#define SOLENOID_BOARD_CAN_FIFO_OVERFLOW_STDID 0x240
+#define SOLENOID_BOARD_CAN_FIFO_OVERFLOW_EXTID 0x00000
+#define SOLENOID_BOARD_CAN_FIFO_OVERFLOW_IDE CAN_ID_STD
+#define SOLENOID_BOARD_CAN_FIFO_OVERFLOW_RTR CAN_RTR_REMOTE
+#define SOLENOID_BOARD_CAN_FIFO_OVERFLOW_DLC 0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,6 +54,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan;
+CAN_TxHeaderTypeDef canTxOverflowMessage;
+uint8_t CAN_EMPTY_DATA[8] = {};
 
 //  Establish Pins used for solenoids
 int solenoidIndices[NUM_SOLENOIDS] = {0, 1, 2, 3, 4, 5};
@@ -150,11 +163,6 @@ void SystemClock_Config(void)
   * @retval None
   */
 
-#define SOLENOID_BOARD_CAN_STANDARD_ID 0x204  //  11 bits
-#define SOLENOID_BOARD_CAN_EXTENDED_ID 0x00000  //  18 bits
-#define SOLENOID_BOARD_CAN_IDE 0
-#define SOLENOID_BOARD_CAN_RTR 0
-
 static void MX_CAN_Init(void)
 {
 	//  Note:
@@ -181,6 +189,31 @@ static void MX_CAN_Init(void)
 		Error_Handler();
 	}
 
+	if (CAN_ConfigureSolenoidBoardReceiveFilter(&hcan) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	CAN_ConfigureCANTxOverflowMessage();
+
+	//  Enable CAN RX FIFO #0 Pending Interrupt
+	if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	HAL_CAN_RegisterCallback(&hcan, HAL_CAN_RX_FIFO0_MSG_PENDING_CB_ID, CAN_ReceiveMessageCallback);
+
+	//  Enable CAN RX FIFO #0 Overflow Interrupt
+	if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_OVERRUN) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	HAL_CAN_RegisterCallback(&hcan, HAL_CAN_ERROR_CB_ID, CAN_ErrorCallback);
+
+}
+
+HAL_StatusTypeDef CAN_ConfigureSolenoidBoardReceiveFilter(CAN_HandleTypeDef* hcan)
+{
 	//  Configure CAN RX Filter
 	CAN_FilterTypeDef solenoidBoardFilter;
 	//  Filter Bank #0 assigned to FIFO #0 (two total RX FIFOs)
@@ -198,8 +231,8 @@ static void MX_CAN_Init(void)
 	solenoidBoardFilter.FilterIdHigh = (SOLENOID_BOARD_CAN_STANDARD_ID << 5);
 	solenoidBoardFilter.FilterIdHigh |= ((SOLENOID_BOARD_CAN_EXTENDED_ID & (0x1F << 13)) >> 13);
 	solenoidBoardFilter.FilterIdLow = (SOLENOID_BOARD_CAN_EXTENDED_ID & 0x1FFF) << 3;
-	solenoidBoardFilter.FilterIdLow |= (SOLENOID_BOARD_CAN_IDE << 2);
-	solenoidBoardFilter.FilterIdLow |= (SOLENOID_BOARD_CAN_RTR << 1);
+	solenoidBoardFilter.FilterIdLow |= SOLENOID_BOARD_CAN_IDE;
+	solenoidBoardFilter.FilterIdLow |= SOLENOID_BOARD_CAN_RTR;
 
 	//  Set CAN Filter Mask
 	//  Bits directly correspond to bits in Filter
@@ -212,18 +245,18 @@ static void MX_CAN_Init(void)
 	solenoidBoardFilter.FilterActivation = CAN_FILTER_ENABLE;
 
 	//  Configure Filter
-	if (HAL_CAN_ConfigFilter(&hcan, &solenoidBoardFilter) != HAL_OK)
-	{
-		Error_Handler();
-	}
+	return HAL_CAN_ConfigFilter(hcan, &solenoidBoardFilter);
+}
 
-	//  Enable CAN FIFO RX Pending Interrupt
-	if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
-	{
-		Error_Handler();
-	}
-
-	HAL_CAN_RegisterCallback(&hcan, HAL_CAN_RX_FIFO0_MSG_PENDING_CB_ID, CAN_ReceiveMessageCallback);
+void CAN_ConfigureCANTxOverflowMessage()
+{
+	//  Configure CAN RX FIFO #0 Overflow CAN TX Message ahead of time
+	canTxOverflowMessage.StdId = SOLENOID_BOARD_CAN_FIFO_OVERFLOW_STDID;
+	canTxOverflowMessage.ExtId = SOLENOID_BOARD_CAN_FIFO_OVERFLOW_EXTID;
+	canTxOverflowMessage.IDE = SOLENOID_BOARD_CAN_FIFO_OVERFLOW_IDE;
+	canTxOverflowMessage.RTR = SOLENOID_BOARD_CAN_FIFO_OVERFLOW_RTR;
+	canTxOverflowMessage.DLC = SOLENOID_BOARD_CAN_FIFO_OVERFLOW_DLC;
+	canTxOverflowMessage.TransmitGlobalTime = DISABLE;
 }
 
 void CAN_ReceiveMessageCallback(CAN_HandleTypeDef *hcan)
@@ -249,6 +282,19 @@ void CAN_ReceiveMessageCallback(CAN_HandleTypeDef *hcan)
 		{
 			disableSolenoid(solenoidIndex);
 		}
+	}
+}
+
+//  Only configured for CAN RX FIFO #0 Overflow Errors
+void CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
+{
+	uint32_t txMailboxNumber;
+
+	//  CAN RX FIFO #0 Overflow Error
+	if ((hcan->ErrorCode & HAL_CAN_ERROR_RX_FOV0) != 0)
+	{
+		//  Send Overflow Error Message on CAN Bus
+		HAL_CAN_AddTxMessage(hcan, &canTxOverflowMessage, CAN_EMPTY_DATA, &txMailboxNumber);
 	}
 }
 

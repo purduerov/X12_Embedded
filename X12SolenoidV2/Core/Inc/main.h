@@ -57,7 +57,12 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 
 SolenoidErrorCode SolenoidInit();
+
+HAL_StatusTypeDef CAN_ConfigureSolenoidBoardReceiveFilter(CAN_HandleTypeDef* hcan);
+void CAN_ConfigureCANTxOverflowMessage();
+
 void CAN_ReceiveMessageCallback(CAN_HandleTypeDef *hcan);
+void CAN_ErrorCallback(CAN_HandleTypeDef *hcan);
 
 /* USER CODE END EFP */
 
