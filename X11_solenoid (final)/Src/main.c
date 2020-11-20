@@ -298,13 +298,37 @@ static void MX_GPIO_Init(void)
 
 }
 
+void DisableAllSolenoids()
+{
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
+}
+
+uint8_t ledState = 0;
+
 /* USER CODE BEGIN 4 */
 void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 {
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 	//If ID is correct and the amount of data being sent is four bytes, converts that data into PWM signals
 	if((hcan->pRxMsg->StdId == 0x204))
 	{
+		DisableAllSolenoids();
+
+		if (ledState != 0)
+		{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
+			ledState = 0;
+		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
+			ledState = 1;
+		}
+
 		sol_byte = hcan->pRxMsg->Data[7];
 
 		//  Solenoid 6
@@ -312,19 +336,11 @@ void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 		{
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET);
 		}
-		else
-		{
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET);
-		}
 
 		//  Solenoid 5
 		if((sol_byte & 0x10) == 0x10)
 		{
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
-		}
-		else
-		{
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
 		}
 
 		//  Solenoid 4
@@ -332,19 +348,11 @@ void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 		{
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
 		}
-		else
-		{
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
-		}
 
 		//  Solenoid 3
 		if((sol_byte & 0x04) == 0x04)
 		{
 			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-		}
-		else
-		{
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 		}
 
 		//  Solenoid 2
@@ -352,21 +360,12 @@ void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 		{
 			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
 		}
-		else
-		{
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
-		}
 
 		//  Solenoid 1
 		if((sol_byte & 0x01) == 0x01)
 		{
 			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);
 		}
-		else
-		{
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
-		}
-
 	}
   //necessary portion that restarts the CAN receiving
 	if (HAL_CAN_Receive_IT(hcan, CAN_FIFO0) != HAL_OK)

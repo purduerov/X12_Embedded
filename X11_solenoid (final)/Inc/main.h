@@ -72,6 +72,7 @@ extern "C" {
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
+void DisableAllSolenoids();
 
 /* USER CODE BEGIN EFP */
 
