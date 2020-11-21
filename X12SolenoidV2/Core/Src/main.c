@@ -62,6 +62,10 @@ int solenoidIndices[NUM_SOLENOIDS] = {0, 1, 2, 3, 4, 5};
 GPIO_TypeDef* gpioPorts[NUM_SOLENOIDS] = {GPIOA, GPIOA, GPIOA, GPIOB, GPIOB, GPIOB};
 uint16_t gpioPins[NUM_SOLENOIDS] = {GPIO_PIN_7, GPIO_PIN_6, GPIO_PIN_5, GPIO_PIN_6, GPIO_PIN_4, GPIO_PIN_3};
 
+//  Establish Pin for LEDs
+GPIO_TypeDef* ledGpioPort = GPIOA;
+uint16_t ledGpioPin = GPIO_PIN_15;
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -194,8 +198,6 @@ static void MX_CAN_Init(void)
 		Error_Handler();
 	}
 
-	CAN_ConfigureCANTxOverflowMessage();
-
 	//  Enable CAN RX FIFO #0 Pending Interrupt
 	if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
 	{
@@ -204,11 +206,14 @@ static void MX_CAN_Init(void)
 	HAL_CAN_RegisterCallback(&hcan, HAL_CAN_RX_FIFO0_MSG_PENDING_CB_ID, CAN_ReceiveMessageCallback);
 
 	//  Enable CAN RX FIFO #0 Overflow Interrupt
+	/*
+	CAN_ConfigureCANTxOverflowMessage();
 	if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_OVERRUN) != HAL_OK)
 	{
 		Error_Handler();
 	}
 	HAL_CAN_RegisterCallback(&hcan, HAL_CAN_ERROR_CB_ID, CAN_ErrorCallback);
+	*/
 
 }
 
@@ -264,12 +269,11 @@ void CAN_ReceiveMessageCallback(CAN_HandleTypeDef *hcan)
 	CAN_RxHeaderTypeDef canPacketHeader;
 	uint8_t canPacketData[8];
 
-	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &canPacketHeader, canPacketData) != HAL_OK)
-	{
-		Error_Handler();
-	}
+	HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &canPacketHeader, canPacketData);
 
 	uint8_t solenoidData = canPacketData[7];
+
+	disableSolenoids();
 	for (int solenoidIndex = 0; solenoidIndex < NUM_SOLENOIDS; solenoidIndex++)
 	{
 		//  Enable Solenoid
@@ -277,12 +281,9 @@ void CAN_ReceiveMessageCallback(CAN_HandleTypeDef *hcan)
 		{
 			enableSolenoid(solenoidIndex);
 		}
-		//  Disable Solenoid
-		else
-		{
-			disableSolenoid(solenoidIndex);
-		}
 	}
+
+	toggleLed();
 }
 
 //  Only configured for CAN RX FIFO #0 Overflow Errors
@@ -305,21 +306,29 @@ void CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
   */
 static void MX_GPIO_Init(void)
 {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  //  Configure GPIO for LED
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
-  GPIO_InitStruct.Pin = GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
+  LedInit();
   SolenoidInit();
+}
+
+void LedInit()
+{
+	GPIO_InitTypeDef gpioInit;
+	gpioInit.Mode = GPIO_MODE_OUTPUT_PP;
+	gpioInit.Pull = GPIO_NOPULL;
+	gpioInit.Speed = GPIO_SPEED_FREQ_LOW;
+
+	configureLed(ledGpioPort, ledGpioPin, &gpioInit);
+}
+
+void LedInitFlash()
+{
+	initializeLedTimer(TIM3);
+	initializeLedFlashFrequency(TIM_FREQ_1HZ);
+	flashLed();
 }
 
 SolenoidErrorCode SolenoidInit()

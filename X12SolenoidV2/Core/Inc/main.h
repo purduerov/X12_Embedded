@@ -57,6 +57,9 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+void LedInit();
+void LedInitFlash();
+
 SolenoidErrorCode SolenoidInit();
 
 HAL_StatusTypeDef CAN_ConfigureSolenoidBoardReceiveFilter(CAN_HandleTypeDef* hcan);
