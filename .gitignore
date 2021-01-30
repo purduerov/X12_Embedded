@@ -1,6 +1,6 @@
 .metadata
 RemoteSystemsTempFiles
-*.
+*.o
 *.su
 *.binary
 *.elf
