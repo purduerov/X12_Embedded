@@ -1,7 +1,7 @@
 import smbus as sb
 import matplotlib.pyplot as plt
 from time import sleep
-
+from random import randint
 Bus = sb.SMBus(1)
 Bus.pec = 1 #enables Packet Error Checking byte
 devAdd1 = 0x23 #device address for weird power brick
@@ -86,6 +86,7 @@ def ReadIOut(devAdd0):
     print(current)
     return current
 
+#def readIVT(devAdd, )
 def StatusWord(devAdd0):
     word = Bus.read_i2c_block_data(devAdd0, 0x79, 2)
     print(f'At device {devAdd0}: {word}')
@@ -117,48 +118,47 @@ def VOutCommand(devAdd0):
     print(f'At device {devAdd0}: {v_out} volts')
 
 
-yes = 'f'
-while yes == 't':
-    actB = int(input('Enter byte for data to read in hexadecimal: '), 16)
-    writeB = int(input('Enter byte to write to register in hex: '), 16)
-    FaultsRW(devAdd2, actB, writeB)
-    yes = input("run again? (y/n)")
-    if yes.lower() == 'y':
-        yes = 't'
-    elif yes.lower() == 'n':
-        yes = 'f'
-y1 = False
-while y1 == True:
-    VOutMode(devAdd2)
-y2 = False
-vals = []
-while y2 == True:
-    vals.append(ReadIOut(devAdd2))
+#yes = 'f'
+#while yes == 't':
+#    actB = int(input('Enter byte for data to read in hexadecimal: '), 16)
+#    writeB = int(input('Enter byte to write to register in hex: '), 16)
+#    FaultsRW(devAdd2, actB, writeB)
+#    yes = input("run again? (y/n)")
+#    if yes.lower() == 'y':
+#        yes = 't'
+#    elif yes.lower() == 'n':
+#        yes = 'f'
+#y1 = False
+#while y1 == True:
+#    VOutMode(devAdd2)
+#y2 = False
+#vals = []
+#while y2 == True:
+#    vals.append(ReadIOut(devAdd2))
 #print(max(vals))
 #readWord(devAdd2)
-def plotRead(devAdd):
+def plotRead(devAdd, tDelay):
     read = int(input('Enter 0 (V_OUT), 1 (TEMP), 2 (V_IN), 3 (CURR)'))
     time = []
-    tDelay = 0.05
     vals = []
     title = ''
     try:
+        t = 0  # time
         while True:
-            t = 0 #time
             if read == 0: #Vout
-                val = ReadVOut(devAdd)
+                val = randint(1,100)#ReadVOut(devAdd)
                 unit = 'volt'
                 title = "Voltage Out"
             elif read == 1: #temp
-                val = readTemperature1(devAdd)
+                val = randint(1,100)#readTemperature1(devAdd)
                 unit = 'F'
                 title = "Temperature"
             elif read == 2: #Vin
-                val = ReadVIn(devAdd)
+                val = randint(1,100)#ReadVIn(devAdd)
                 unit = 'volt'
                 title = "Voltage In"
             elif read == 3: # curr
-                val = ReadIOut(devAdd)
+                val = randint(1,100)#ReadIOut(devAdd)
                 unit = 'amp'
                 title = "Current"
             time.append(t)
@@ -175,4 +175,4 @@ def plotRead(devAdd):
     ax.set_ylabel(f"{title} ({unit})")
     plt.show()
 
-
+plotRead(devAdd2, 0.05)
