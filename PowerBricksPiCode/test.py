@@ -29,20 +29,24 @@ devAdd2 = 0x7f #device address for normal power brick
 #    print("0x%x" % oper[0])
 #    print("0x%x" % oper[1])
 
-def Faults(devAdd0, actionB, writeB):
+def FaultsRW(devAdd0, actionB, writeB):
     Bus.write_byte_data(devAdd0, actionB, writeB)
     f = Bus.read_byte_data(devAdd0, actionB)
     print("0x%x" % f)
-def IOutFault(devAdd0):
-    #Bus.write_byte_data(devAdd0, 0x47, 0xc0)
+def IOutOCFaultResponseRead(devAdd0):
     f = Bus.read_byte_data(devAdd0, 0x47)
     print("0x%x" % f)
-IOutFault(devAdd2)
+
+def IOutOCFaultResponseRW(devAdd0):
+    Bus.write_byte_data(devAdd0, 0x47, 0xc0)
+    f = Bus.read_byte_data(devAdd0, 0x47)
+    print("0x%x" % f)
+
 def VOutMode(devAdd0):
     f = Bus.read_byte_data(devAdd0, 0x20)
     print("0x%x" % f)
 #IOutFault(0x23)
-def readVOut(devAdd0):
+def ReadVOut(devAdd0):
     v = Bus.read_i2c_block_data(devAdd0, 0x8b, 2) #list of bytes
     #print(v)
     hiB = v[1] << 8 #high byte is second element shifted 8 bits
@@ -52,7 +56,7 @@ def readVOut(devAdd0):
     #print(f'At device {devAdd0}: {v_out} volts')
     return v_out
 
-def readTemp(devAdd0):
+def readTemperature1(devAdd0):
     t = Bus.read_i2c_block_data(devAdd0, 0x8d, 2)
     #print(t)
     hiT = (t[1] & 0x7)<<8
@@ -63,7 +67,7 @@ def readTemp(devAdd0):
     #print(f'At device {devAdd0}: {1.8*temp+32} F')
     return tempF
     
-def readVIn(devAdd0):
+def ReadVIn(devAdd0):
     vIn = Bus.read_i2c_block_data(devAdd0, 0x88, 2)
     #print(v_in)
     hiV = (vIn[1] & 0x7)<<8
@@ -72,7 +76,7 @@ def readVIn(devAdd0):
     v_in = manVin * (2**-3)
     #print(f'At device {devAdd0}: {vIn} volts')
     return v_in
-def readCurr(devAdd0):
+def ReadIOut(devAdd0):
     curr = Bus.read_i2c_block_data(devAdd0, 0x8c, 2)
     #print(curr)
     hiI = (curr[1] & 0x7) << 8
@@ -82,14 +86,14 @@ def readCurr(devAdd0):
     print(current)
     return current
 
-def readWord(devAdd0):
+def StatusWord(devAdd0):
     word = Bus.read_i2c_block_data(devAdd0, 0x79, 2)
     print(f'At device {devAdd0}: {word}')
 
-def readCommState(devAdd):
+def StatusCML(devAdd):
     commState = Bus.read_i2c_block_data(devAdd, 0x7e, 1)
     print(commState)
-def readVIn2(devAdd0):
+def VInOffRead(devAdd0):
     v_in = Bus.read_i2c_block_data(devAdd0, 0x36, 2)
     print(f'At device {devAdd0}: {v_in} volts')
     hiV = (v_in[1] & 0x7)<<8
@@ -98,12 +102,12 @@ def readVIn2(devAdd0):
     vIn = manVin * (2**-3)
     #print(f'At address {devAdd0}: {vIn}')
 
-def writeVIn2(devAdd0):
+def VInOffWrite(devAdd0):
     Bus.write_i2c_block_data(devAdd0, 0x36, [233, 16])
-def readVInStat(devAdd0):
+def StatusInput(devAdd0):
     vinStat = Bus.read_i2c_block_data(devAdd0, 0x7c, 1)
     print(f'At device {devAdd0}: {vinStat}')
-def VOutComm(devAdd0):
+def VOutCommand(devAdd0):
     v = Bus.read_i2c_block_data(devAdd0, 0x21, 2) #list of bytes
     #print(v)
     hiB = v[1] << 8 #high byte is second element shifted 8 bits
@@ -117,7 +121,7 @@ yes = 'f'
 while yes == 't':
     actB = int(input('Enter byte for data to read in hexadecimal: '), 16)
     writeB = int(input('Enter byte to write to register in hex: '), 16)
-    Faults(devAdd2, actB, writeB)
+    FaultsRW(devAdd2, actB, writeB)
     yes = input("run again? (y/n)")
     if yes.lower() == 'y':
         yes = 't'
@@ -129,7 +133,7 @@ while y1 == True:
 y2 = False
 vals = []
 while y2 == True:
-    vals.append(readCurr(devAdd2))
+    vals.append(ReadIOut(devAdd2))
 #print(max(vals))
 #readWord(devAdd2)
 def plotRead(devAdd):
@@ -142,19 +146,19 @@ def plotRead(devAdd):
         while True:
             t = 0 #time
             if read == 0: #Vout
-                val = readVOut(devAdd)
+                val = ReadVOut(devAdd)
                 unit = 'volt'
                 title = "Voltage Out"
             elif read == 1: #temp
-                val = readTemp(devAdd)
+                val = readTemperature1(devAdd)
                 unit = 'F'
                 title = "Temperature"
             elif read == 2: #Vin
-                val = readVIn(devAdd)
+                val = ReadVIn(devAdd)
                 unit = 'volt'
                 title = "Voltage In"
             elif read == 3: # curr
-                val = readCurr(devAdd)
+                val = ReadIOut(devAdd)
                 unit = 'amp'
                 title = "Current"
             time.append(t)
