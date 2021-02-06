@@ -34,10 +34,14 @@ def Faults(devAdd0, actionB, writeB):
     f = Bus.read_byte_data(devAdd0, actionB)
     print("0x%x" % f)
 def IOutFault(devAdd0):
-    Bus.write_byte_data(devAdd0, 0x47, 0xc0)
+    #Bus.write_byte_data(devAdd0, 0x47, 0xc0)
     f = Bus.read_byte_data(devAdd0, 0x47)
     print("0x%x" % f)
-IOutFault(0x23)
+IOutFault(devAdd2)
+def VOutMode(devAdd0):
+    f = Bus.read_byte_data(devAdd0, 0x20)
+    print("0x%x" % f)
+#IOutFault(0x23)
 def readVOut(devAdd0):
     v = Bus.read_i2c_block_data(devAdd0, 0x8b, 2) #list of bytes
     #print(v)
@@ -75,7 +79,7 @@ def readCurr(devAdd0):
     loI = curr[0]
     manCurr = hiI + loI
     current = manCurr * (2 ** -4)
-    #print(current)
+    print(current)
     return current
 
 def readWord(devAdd0):
@@ -109,21 +113,27 @@ def VOutComm(devAdd0):
     print(f'At device {devAdd0}: {v_out} volts')
 
 
-yes = True
-while yes == True:
-    actB = int(input('Enter byte for data to read in hexadecimal'), 16)
-    writeB = int(input('Enter byte to write to register in binary'), 2)
+yes = 'f'
+while yes == 't':
+    actB = int(input('Enter byte for data to read in hexadecimal: '), 16)
+    writeB = int(input('Enter byte to write to register in hex: '), 16)
     Faults(devAdd2, actB, writeB)
     yes = input("run again? (y/n)")
     if yes.lower() == 'y':
-        yes = True
+        yes = 't'
     elif yes.lower() == 'n':
-        yes = False
-
-
-
+        yes = 'f'
+y1 = False
+while y1 == True:
+    VOutMode(devAdd2)
+y2 = False
+vals = []
+while y2 == True:
+    vals.append(readCurr(devAdd2))
+#print(max(vals))
+#readWord(devAdd2)
 def plotRead(devAdd):
-    read = int('Enter 0 (V_OUT), 1 (TEMP), 2 (V_IN), 3 (CURR)')
+    read = int(input('Enter 0 (V_OUT), 1 (TEMP), 2 (V_IN), 3 (CURR)'))
     time = []
     tDelay = 0.05
     vals = []
@@ -157,4 +167,8 @@ def plotRead(devAdd):
     fig, ax = plt.subplots()
     ax.plot(time, vals)
     ax.set_title(title)
-    ax.set_xlabel
+    ax.set_xlabel('Time (sec)')
+    ax.set_ylabel(f"{title} ({unit})")
+    plt.show()
+
+
