@@ -126,15 +126,19 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* hadc)
   /* USER CODE END ADC1_MspInit 0 */
     /* Peripheral clock enable */
     __HAL_RCC_ADC1_CLK_ENABLE();
+
+    //  Configure ADC Clock to 14MHz Asynchronous CLK
+    RCC_OscInitTypeDef adcClockConfiguration;
+    adcClockConfiguration.OscillatorType = RCC_OSCILLATORTYPE_HSI14;
+    adcClockConfiguration.HSI14State = RCC_HSI14_ADC_CONTROL;
+    adcClockConfiguration.HSI14CalibrationValue = RCC_HSI14CALIBRATION_DEFAULT;
+    HAL_RCC_OscConfig(&adcClockConfiguration);
   
     __HAL_RCC_GPIOA_CLK_ENABLE();
     /**ADC GPIO Configuration    
     PA0     ------> ADC_IN0
-    PA1     ------> ADC_IN1
-    PA2     ------> ADC_IN2
-    PA3     ------> ADC_IN3 
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3;
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);

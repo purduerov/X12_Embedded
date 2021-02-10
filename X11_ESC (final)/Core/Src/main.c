@@ -73,10 +73,11 @@ int spoof_ar [4] = {0, 127, 255, 200}; //a spoof array for testing pwm without C
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc;
-
 CAN_HandleTypeDef hcan;
-
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef tim14;
+
+uint8_t adcConfigured = 0;
 
 /* USER CODE BEGIN PV */
 
@@ -88,6 +89,7 @@ static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
 static void MX_ADC_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM14_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -129,10 +131,13 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+  MX_ADC_Init();
+  MX_TIM14_Init();
+
   MX_GPIO_Init();
   MX_CAN_Init();
-  MX_ADC_Init();
   MX_TIM3_Init();
+
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
@@ -250,6 +255,7 @@ static void MX_ADC_Init(void)
   hadc.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc.Init.DMAContinuousRequests = DISABLE;
   hadc.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc.State = HAL_ADC_STATE_RESET;
   if (HAL_ADC_Init(&hadc) != HAL_OK)
   {
     Error_Handler();
@@ -263,27 +269,9 @@ static void MX_ADC_Init(void)
   {
     Error_Handler();
   }
-  /**Configure for the selected ADC regular channel to be converted. 
-  */
-  sConfig.Channel = ADC_CHANNEL_1;
-  if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /**Configure for the selected ADC regular channel to be converted. 
-  */
-  sConfig.Channel = ADC_CHANNEL_2;
-  if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /**Configure for the selected ADC regular channel to be converted. 
-  */
-  sConfig.Channel = ADC_CHANNEL_3;
-  if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
+
+  //  Calibration and Stabilization
+  HAL_ADCEx_Calibration_Start(&hadc);
   /* USER CODE BEGIN ADC_Init 2 */
 
   /* USER CODE END ADC_Init 2 */
@@ -446,6 +434,8 @@ int byte_to_pwm(int byte)
 	return (exact + 0.5); //rounds up the integer by adding 0.5
 }
 
+uint32_t canId;
+
 void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 {
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
@@ -474,26 +464,41 @@ void CAN_Spoof(int* spoof_ar)
   //necessary portion
 }
 
-void  HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) //is called on each end of conversion for a single adc channel
+#define CAN_ID_201_LOW_THRESHOLD 0
+#define CAN_ID_201_HIGH_THRESHOLD 1000
+#define CAN_ID_202_LOW_THRESHOLD CAN_ID_201_HIGH_THRESHOLD
+#define CAN_ID_202_HIGH_THRESHOLD 2000
+#define CAN_ID_203_LOW_THRESHOLD CAN_ID_202_HIGH_THRESHOLD
+#define CAN_ID_203_HIGH_THRESHOLD 3000
+
+#define CAN_ID_201_FLASH_MS 500
+#define CAN_ID_202_FLASH_MS 250
+#define CAN_ID_203_FLASH_MS 125
+
+void  HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-	adc_val[adc_count] = HAL_ADC_GetValue(hadc); //stores the current conversion in the corresponding spot in adc_val
-	//the code that would be used to check when the current is too high
-	/*
-	if(adc_val[adc_count] > (4095 * (WANTED_VOLT/MAX_VOLT)))
+	uint32_t adcValue = HAL_ADC_GetValue(hadc);
+
+	if (adcValue >= CAN_ID_201_LOW_THRESHOLD && adcValue < CAN_ID_201_HIGH_THRESHOLD)
 	{
-		Error_Handler();
+		canId = 0x201;
+		tim14.Init.Period = CAN_ID_201_FLASH_MS - 1;
 	}
-    */
-	//keeps track of the current adc conversion and restarts at end of sequence
-	if(adc_count > 2)
+	else if (adcValue >= CAN_ID_202_LOW_THRESHOLD && adcValue < CAN_ID_202_HIGH_THRESHOLD)
 	{
-		adc_count = 0;
-		HAL_ADC_Start_IT(hadc);
+		canId = 0x202;
+		tim14.Init.Period = CAN_ID_202_FLASH_MS - 1;
 	}
-	else
+	else if (adcValue >= CAN_ID_203_LOW_THRESHOLD && adcValue < CAN_ID_203_HIGH_THRESHOLD)
 	{
-		adc_count++;
+		canId = 0x203;
+		tim14.Init.Period = CAN_ID_203_FLASH_MS - 1;
 	}
+	adcConfigured = 1;
+
+	//  Restart TIM14 to flash PA15 LED
+	HAL_TIM_Base_Start_IT(&tim14);
+
 }
 /* USER CODE END 4 */
 
@@ -511,43 +516,49 @@ void Error_Handler(void)
 	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_4);
 	HAL_ADC_Stop_IT(&hadc);
 
-	while(1)
+	/* while(1)
 	{
 	    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_15);
 	    nano_wait(10000000);
-	}
+	} */
   /* USER CODE END Error_Handler_Debug */
 }
 
 #define NUM_ADC_INIT_WAIT_MS 1000
 static void MX_TIM14_Init(void)
 {
-	TIM_HandleTypeDef adcStartTimer;
-	adcStartTimer.Instance = TIM14;
+	tim14.Instance = TIM14;
 
 	//  Initialize Counter to generate UEV after NUM_ADC_INIT_WAIT_MS milliseconds
-	TIM_Base_InitTypeDef adcStartTimerProperties;
-	adcStartTimerProperties.Prescaler = 8000 - 1;
-	adcStartTimerProperties.CounterMode = TIM_COUNTERMODE_UP;
-	adcStartTimerProperties.Period = NUM_ADC_INIT_WAIT_MS - 1;
-	adcStartTimerProperties.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-	adcStartTimerProperties.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-	adcStartTimer.Init = adcStartTimerProperties;
+	tim14.Init.Prescaler = 8000 - 1;
+	tim14.Init.CounterMode = TIM_COUNTERMODE_UP;
+	tim14.Init.Period = NUM_ADC_INIT_WAIT_MS - 1;
+	tim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	tim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 
-	adcStartTimer.State = HAL_TIM_STATE_RESET;
+	tim14.State = HAL_TIM_STATE_RESET;
 
-	HAL_TIM_Base_Init(&adcStartTimer);
-	__HAL_TIM_CLEAR_FLAG(&adcStartTimer, TIM_FLAG_UPDATE);  //  Clear Status Register
+	HAL_TIM_Base_Init(&tim14);
+	__HAL_TIM_CLEAR_FLAG(&tim14, TIM_FLAG_UPDATE);  //  Clear Status Register
 
-	HAL_TIM_Base_Start_IT(&adcStartTimer);
+	HAL_TIM_Base_Start_IT(&tim14);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 {
-	//  Disable Timer
-	HAL_TIM_Base_Stop_IT(htim);
-	//  Start ADC
-	//  TODO
+	if (!adcConfigured)
+	{
+		//  Disable Timer
+		HAL_TIM_Base_Stop_IT(htim);
+		//  Turn off LED
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
+		//  Start ADC
+		HAL_ADC_Start_IT(&hadc);
+	}
+	else
+	{
+		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_15);
+	}
 }
 
 #ifdef  USE_FULL_ASSERT
