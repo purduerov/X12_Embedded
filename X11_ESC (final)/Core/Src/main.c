@@ -225,7 +225,6 @@ void SystemClock_Config(void)
   */
 static void MX_ADC_Init(void)
 {
-
   /* USER CODE BEGIN ADC_Init 0 */
 
   /* USER CODE END ADC_Init 0 */
@@ -518,6 +517,37 @@ void Error_Handler(void)
 	    nano_wait(10000000);
 	}
   /* USER CODE END Error_Handler_Debug */
+}
+
+#define NUM_ADC_INIT_WAIT_MS 1000
+static void MX_TIM14_Init(void)
+{
+	TIM_HandleTypeDef adcStartTimer;
+	adcStartTimer.Instance = TIM14;
+
+	//  Initialize Counter to generate UEV after NUM_ADC_INIT_WAIT_MS milliseconds
+	TIM_Base_InitTypeDef adcStartTimerProperties;
+	adcStartTimerProperties.Prescaler = 8000 - 1;
+	adcStartTimerProperties.CounterMode = TIM_COUNTERMODE_UP;
+	adcStartTimerProperties.Period = NUM_ADC_INIT_WAIT_MS - 1;
+	adcStartTimerProperties.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	adcStartTimerProperties.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+	adcStartTimer.Init = adcStartTimerProperties;
+
+	adcStartTimer.State = HAL_TIM_STATE_RESET;
+
+	HAL_TIM_Base_Init(&adcStartTimer);
+	__HAL_TIM_CLEAR_FLAG(&adcStartTimer, TIM_FLAG_UPDATE);  //  Clear Status Register
+
+	HAL_TIM_Base_Start_IT(&adcStartTimer);
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+{
+	//  Disable Timer
+	HAL_TIM_Base_Stop_IT(htim);
+	//  Start ADC
+	//  TODO
 }
 
 #ifdef  USE_FULL_ASSERT

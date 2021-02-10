@@ -107,6 +107,16 @@ void HAL_MspInit(void)
 */
 void HAL_ADC_MspInit(ADC_HandleTypeDef* hadc)
 {
+  //  Idea:
+  /*
+   * Start a timer for one second during micro initialization
+   * Once timer is done, read ADC and configure CAN ID accordingly
+   * LED solid during 1 second wait
+   * Flash LED at a certain rate depending on configured CAN ID
+   * Ex. 0x201 1 flash/sec; 0x202 2 flash/sec; 0x203 3 flash/sec
+   * Then disable ADC once process is finished
+   */
+
 
   GPIO_InitTypeDef GPIO_InitStruct = {0};
   if(hadc->Instance==ADC1)
@@ -330,6 +340,15 @@ void HAL_TIM_PWM_MspDeInit(TIM_HandleTypeDef* htim_pwm)
   /* USER CODE END TIM3_MspDeInit 1 */
   }
 
+}
+
+void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim)
+{
+	if (htim->Instance == TIM14)
+	{
+		__HAL_RCC_TIM14_CLK_ENABLE();
+		HAL_NVIC_EnableIRQ(TIM14_IRQn);
+	}
 }
 
 /* USER CODE BEGIN 1 */
