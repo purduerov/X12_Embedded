@@ -2,6 +2,7 @@ import smbus as sb
 import matplotlib.pyplot as plt
 from time import sleep
 from random import randint
+from csv import writer
 Bus = sb.SMBus(1)
 Bus.pec = 1 #enables Packet Error Checking byte
 devAdd1 = 0x23 #device address for weird power brick
@@ -138,41 +139,45 @@ def VOutCommand(devAdd0):
 #print(max(vals))
 #readWord(devAdd2)
 def plotRead(devAdd, tDelay):
-    read = int(input('Enter 0 (V_OUT), 1 (TEMP), 2 (V_IN), 3 (CURR)'))
+    read = int(input('Enter 0 (V_OUT), 1 (TEMP), 2 (V_IN), 3 (CURR): '))
     time = []
     vals = []
     title = ''
-    try:
-        t = 0  # time
-        while True:
-            if read == 0: #Vout
-                val = randint(1,100)#ReadVOut(devAdd)
-                unit = 'volt'
-                title = "Voltage Out"
-            elif read == 1: #temp
-                val = randint(1,100)#readTemperature1(devAdd)
-                unit = 'F'
-                title = "Temperature"
-            elif read == 2: #Vin
-                val = randint(1,100)#ReadVIn(devAdd)
-                unit = 'volt'
-                title = "Voltage In"
-            elif read == 3: # curr
-                val = randint(1,100)#ReadIOut(devAdd)
-                unit = 'amp'
-                title = "Current"
-            time.append(t)
-            vals.append(val)
-            sleep(tDelay)
-            t += tDelay
-    except KeyboardInterrupt:
-        pass
+    with open('ROVdata.csv', 'w', encoding = 'UTF8', newline = '') as fw:
+        ROVw = writer(fw)
+        try:
+            t = 0  # time
+            while True:
+                if read == 0: #Vout
+                    val = randint(1,100)#ReadVOut(devAdd)
+                    unit = 'volt'
+                    title = "Voltage Out"
+                elif read == 1: #temp
+                    val = randint(1,100)#readTemperature1(devAdd)
+                    unit = 'F'
+                    title = "Temperature"
+                elif read == 2: #Vin
+                    val = randint(1,100)#ReadVIn(devAdd)
+                    unit = 'volt'
+                    title = "Voltage In"
+                elif read == 3: # curr
+                    val = randint(1,100)#ReadIOut(devAdd)
+                    unit = 'amp'
+                    title = "Current"
+                time.append(t)
+                vals.append(val)
+                sleep(tDelay)
+                t += tDelay
+        except KeyboardInterrupt:
+            ROVw.writerow(time)
+            ROVw.writerow(vals)
+            pass
 
-    fig, ax = plt.subplots()
-    ax.plot(time, vals)
-    ax.set_title(title)
-    ax.set_xlabel('Time (sec)')
-    ax.set_ylabel(f"{title} ({unit})")
-    plt.show()
+        fig, ax = plt.subplots()
+        ax.plot(time, vals)
+        ax.set_title(title)
+        ax.set_xlabel('Time (sec)')
+        ax.set_ylabel(f"{title} ({unit})")
+        plt.show()
 
 plotRead(devAdd2, 0.05)
