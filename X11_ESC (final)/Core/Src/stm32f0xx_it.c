@@ -73,6 +73,7 @@
 /* External variables --------------------------------------------------------*/
 extern ADC_HandleTypeDef hadc;
 extern CAN_HandleTypeDef hcan;
+extern TIM_HandleTypeDef tim14;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -184,6 +185,9 @@ void CEC_CAN_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
-
+void TIM14_IRQHandler(void)
+{
+	HAL_TIM_IRQHandler(&tim14);
+}
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

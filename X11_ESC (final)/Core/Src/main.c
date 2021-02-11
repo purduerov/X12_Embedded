@@ -54,7 +54,18 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define NUM_ADC_INIT_WAIT_MS 500
 
+#define CAN_ID_201_LOW_THRESHOLD 0
+#define CAN_ID_201_HIGH_THRESHOLD 1400
+#define CAN_ID_202_LOW_THRESHOLD (CAN_ID_201_HIGH_THRESHOLD + 1)
+#define CAN_ID_202_HIGH_THRESHOLD 2800
+#define CAN_ID_203_LOW_THRESHOLD (CAN_ID_202_HIGH_THRESHOLD + 1)
+#define CAN_ID_203_HIGH_THRESHOLD 4095
+
+#define CAN_ID_201_FLASH_MS 1000
+#define CAN_ID_202_FLASH_MS 500
+#define CAN_ID_203_FLASH_MS 250
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -78,6 +89,7 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef tim14;
 
 uint8_t adcConfigured = 0;
+uint32_t canId;
 
 /* USER CODE BEGIN PV */
 
@@ -131,11 +143,10 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+  MX_ADC_Init();
   MX_GPIO_Init();
   MX_CAN_Init();
   MX_TIM3_Init();
-
-  MX_ADC_Init();
   MX_TIM14_Init();
 
   /* USER CODE BEGIN 2 */
@@ -154,7 +165,7 @@ int main(void)
     //nano_wait(30000000);
     //nano_wait(30000000);
 
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
     TIM3->CCR1 = 75;
     TIM3->CCR2 = 75;
     TIM3->CCR3 = 75;
@@ -264,7 +275,7 @@ static void MX_ADC_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_RANK_CHANNEL_NUMBER;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -434,13 +445,11 @@ int byte_to_pwm(int byte)
 	return (exact + 0.5); //rounds up the integer by adding 0.5
 }
 
-uint32_t canId;
-
 void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 {
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 	//If ID is correct and the amount of data being sent is four bytes, converts that data into PWM signals
-	if((hcan->pRxMsg->StdId == 0x202))
+	if((hcan->pRxMsg->StdId == canId))
 	{
 		TIM3->CCR1 = byte_to_pwm((int)hcan->pRxMsg->Data[7]); //U7
 		TIM3->CCR2 = byte_to_pwm((int)hcan->pRxMsg->Data[6]); //U2
@@ -464,39 +473,29 @@ void CAN_Spoof(int* spoof_ar)
   //necessary portion
 }
 
-#define CAN_ID_201_LOW_THRESHOLD 0
-#define CAN_ID_201_HIGH_THRESHOLD 1000
-#define CAN_ID_202_LOW_THRESHOLD CAN_ID_201_HIGH_THRESHOLD
-#define CAN_ID_202_HIGH_THRESHOLD 2000
-#define CAN_ID_203_LOW_THRESHOLD CAN_ID_202_HIGH_THRESHOLD
-#define CAN_ID_203_HIGH_THRESHOLD 3000
-
-#define CAN_ID_201_FLASH_MS 500
-#define CAN_ID_202_FLASH_MS 250
-#define CAN_ID_203_FLASH_MS 125
-
 void  HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	uint32_t adcValue = HAL_ADC_GetValue(hadc);
 
-	if (adcValue >= CAN_ID_201_LOW_THRESHOLD && adcValue < CAN_ID_201_HIGH_THRESHOLD)
+	if (adcValue >= CAN_ID_201_LOW_THRESHOLD && adcValue <= CAN_ID_201_HIGH_THRESHOLD)
 	{
 		canId = 0x201;
 		tim14.Init.Period = CAN_ID_201_FLASH_MS - 1;
 	}
-	else if (adcValue >= CAN_ID_202_LOW_THRESHOLD && adcValue < CAN_ID_202_HIGH_THRESHOLD)
+	else if (adcValue >= CAN_ID_202_LOW_THRESHOLD && adcValue <= CAN_ID_202_HIGH_THRESHOLD)
 	{
 		canId = 0x202;
 		tim14.Init.Period = CAN_ID_202_FLASH_MS - 1;
 	}
-	else if (adcValue >= CAN_ID_203_LOW_THRESHOLD && adcValue < CAN_ID_203_HIGH_THRESHOLD)
+	else if (adcValue >= CAN_ID_203_LOW_THRESHOLD && adcValue <= CAN_ID_203_HIGH_THRESHOLD)
 	{
 		canId = 0x203;
 		tim14.Init.Period = CAN_ID_203_FLASH_MS - 1;
 	}
-	adcConfigured = 1;
 
 	//  Restart TIM14 to flash PA15 LED
+	HAL_ADC_Stop_IT(hadc);
+	tim14.Instance->ARR = tim14.Init.Period;
 	HAL_TIM_Base_Start_IT(&tim14);
 
 }
@@ -524,7 +523,6 @@ void Error_Handler(void)
   /* USER CODE END Error_Handler_Debug */
 }
 
-#define NUM_ADC_INIT_WAIT_MS 1000
 static void MX_TIM14_Init(void)
 {
 	tim14.Instance = TIM14;
@@ -536,13 +534,12 @@ static void MX_TIM14_Init(void)
 	tim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	tim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 
-	//tim14.State = HAL_TIM_STATE_RESET;
-
 	if (HAL_TIM_Base_Init(&tim14) != HAL_OK)
 	{
 		Error_Handler();
 	}
-	//__HAL_TIM_CLEAR_FLAG(&tim14, TIM_FLAG_UPDATE);  //  Clear Status Register
+
+	tim14.Instance->SR = 0;
 	HAL_TIM_Base_Start_IT(&tim14);
 }
 
@@ -550,12 +547,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 {
 	if (!adcConfigured)
 	{
-		//  Disable Timer
 		HAL_TIM_Base_Stop_IT(htim);
-		//  Turn off LED
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
-		//  Start ADC
 		HAL_ADC_Start_IT(&hadc);
+		adcConfigured = 1;
 	}
 	else
 	{
