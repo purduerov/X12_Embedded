@@ -56,16 +56,29 @@
 /* USER CODE BEGIN PD */
 #define NUM_ADC_INIT_WAIT_MS 500
 
-#define CAN_ID_201_LOW_THRESHOLD 0
-#define CAN_ID_201_HIGH_THRESHOLD 1400
-#define CAN_ID_202_LOW_THRESHOLD (CAN_ID_201_HIGH_THRESHOLD + 1)
-#define CAN_ID_202_HIGH_THRESHOLD 2800
-#define CAN_ID_203_LOW_THRESHOLD (CAN_ID_202_HIGH_THRESHOLD + 1)
-#define CAN_ID_203_HIGH_THRESHOLD 4095
+/*
+ * The resistor voltage divisions for the CAN ID have a pull up on the ESC controller board
+ * where this micro is. The pull down is on the backplane. ID 206 will be used if the board
+ * is unconnected, resulting in ADC value of VCC (4095). The other voltage divisions are
+ * designed to be at 0.3, 0.5, and 0.7 VCC. So the "bins" for them will be 0.2 to 0.4 are 0.3
+ * or ID 201, 0.4 to 0.6 are 0.5 or ID 202, and 0.6 to 0.8 are 0.7 or ID 203.
+ */
+
+#define ADC_MAX_VALUE (4095)
+#define CAN_ID_201_LOW_THRESHOLD (ADC_MAX_VALUE / 5)
+#define CAN_ID_202_LOW_THRESHOLD (ADC_MAX_VALUE / 5 * 2)
+#define CAN_ID_203_LOW_THRESHOLD (ADC_MAX_VALUE / 5 * 3)
+#define CAN_ID_206_LOW_THRESHOLD (ADC_MAX_VALUE / 5 * 4)
+#define CAN_ID_201_HIGH_THRESHOLD (CAN_ID_202_LOW_THRESHOLD - 1)
+#define CAN_ID_202_HIGH_THRESHOLD (CAN_ID_203_LOW_THRESHOLD - 1)
+#define CAN_ID_203_HIGH_THRESHOLD (CAN_ID_206_LOW_THRESHOLD - 1)
+#define CAN_ID_206_HIGH_THRESHOLD ADC_MAX_VALUE
 
 #define CAN_ID_201_FLASH_MS 1000
 #define CAN_ID_202_FLASH_MS 500
 #define CAN_ID_203_FLASH_MS 250
+#define CAN_ID_203_FLASH_MS 2000
+#define ERROR_FLASH_MS 4000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -477,20 +490,29 @@ void  HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	uint32_t adcValue = HAL_ADC_GetValue(hadc);
 
-	if (adcValue >= CAN_ID_201_LOW_THRESHOLD && adcValue <= CAN_ID_201_HIGH_THRESHOLD)
+	if (CAN_ID_201_LOW_THRESHOLD <= adcValue && adcValue <= CAN_ID_201_HIGH_THRESHOLD)
 	{
 		canId = 0x201;
 		tim14.Init.Period = CAN_ID_201_FLASH_MS - 1;
 	}
-	else if (adcValue >= CAN_ID_202_LOW_THRESHOLD && adcValue <= CAN_ID_202_HIGH_THRESHOLD)
+	else if (CAN_ID_202_LOW_THRESHOLD <= adcValue && adcValue <= CAN_ID_202_HIGH_THRESHOLD)
 	{
 		canId = 0x202;
 		tim14.Init.Period = CAN_ID_202_FLASH_MS - 1;
 	}
-	else if (adcValue >= CAN_ID_203_LOW_THRESHOLD && adcValue <= CAN_ID_203_HIGH_THRESHOLD)
+	else if (CAN_ID_203_LOW_THRESHOLD <= adcValue && adcValue <= CAN_ID_203_HIGH_THRESHOLD)
 	{
 		canId = 0x203;
 		tim14.Init.Period = CAN_ID_203_FLASH_MS - 1;
+	}
+	else if (CAN_ID_206_LOW_THRESHOLD <= adcValue && adcValue <= CAN_ID_206_HIGH_THRESHOLD)
+	{
+		canId = 0x206;
+		tim14.Init.Period = CAN_ID_206_FLASH_MS - 1;
+	}
+	else
+	{
+		tim14.Init.Period = ERROR_FLASH_MS - 1;
 	}
 
 	//  Restart TIM14 to flash PA15 LED
