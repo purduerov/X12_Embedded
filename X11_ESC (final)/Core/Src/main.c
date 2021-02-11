@@ -96,13 +96,13 @@ static void MX_TIM14_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static void nano_wait(int t) {
+/*static void nano_wait(int t) {
     asm("       mov r0,%0\n"
-        "repeat:\n"
+        "repeatttt:\n"
         "       sub r0,#14\n"
-        "       bgt repeat\n"
+        "       bgt repeatttt\n"
         : : "r"(t) : "r0", "cc");
-}
+} */
 /* USER CODE END 0 */
 
 /**
@@ -131,12 +131,12 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-  MX_ADC_Init();
-  MX_TIM14_Init();
-
   MX_GPIO_Init();
   MX_CAN_Init();
   MX_TIM3_Init();
+
+  MX_ADC_Init();
+  MX_TIM14_Init();
 
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
@@ -151,8 +151,8 @@ int main(void)
     TIM3->CCR3 = 95;
     TIM3->CCR4 = 95;
 */
-    nano_wait(30000000);
-    nano_wait(30000000);
+    //nano_wait(30000000);
+    //nano_wait(30000000);
 
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
     TIM3->CCR1 = 75;
@@ -165,7 +165,7 @@ int main(void)
   {
 	  Error_Handler();
   }
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
+  //HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -536,11 +536,13 @@ static void MX_TIM14_Init(void)
 	tim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	tim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 
-	tim14.State = HAL_TIM_STATE_RESET;
+	//tim14.State = HAL_TIM_STATE_RESET;
 
-	HAL_TIM_Base_Init(&tim14);
-	__HAL_TIM_CLEAR_FLAG(&tim14, TIM_FLAG_UPDATE);  //  Clear Status Register
-
+	if (HAL_TIM_Base_Init(&tim14) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	//__HAL_TIM_CLEAR_FLAG(&tim14, TIM_FLAG_UPDATE);  //  Clear Status Register
 	HAL_TIM_Base_Start_IT(&tim14);
 }
 
