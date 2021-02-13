@@ -8,27 +8,24 @@ Bus.pec = 1 #enables Packet Error Checking byte
 devAdd1 = 0x23 #device address for weird power brick
 devAdd2 = 0x7f #device address for normal power brick
 
+#Single Read
+def OneRead(devAdd0):
+    byte = int(input("Choose data to read"), 16)
 
-#with sb.SMBus(1) as Bus:
-#curr = (2 **-4) * (Bus.read_i2c_block_data(devAdd, 0x8c, 2) & 0x07FF) #current (amps)
-#v_out = (2 ** -12) * Bus.read_i2c_block_data(devAdd, 0x8b, 2) #voltage out (volts)
-    #v_in = Bus.read_byte_data(devAdd, 0x88) #voltage in
-#temp = (2 ** - 2) * (Bus.read_i2c_block_data(devAdd, 0x8d, 2) & 0x07FF) #temperature (degrees Celsius)
-#Bus.write_byte(devAdd, 0x03)
+    if byte == 0x47:
+        IOutOCFaultResponseRead(devAdd0)
+    elif byte == 0x20:
+        VOutMode(devAdd0)
+    elif byte == 0x79:
+        StatusWord(devAdd0)
+    elif byte == 0x7e:
+        StatusCML(devAdd0)
 
-#Bus.write_byte_data(devAdd, 0x02, 0x1d)
-#print(Bus.read_i2c_block_data(devAdd, 0x7e, 1))
-
-#x=0
-#if x == 1:
-#    z_2 = Bus.read_byte_data(devAdd, 0x20)
-#    print("0x%x" % z_2)
-
-#y=0
-#if y == 1:
-#    oper = Bus.read_i2c_block_data(devAdd, 0x79, 2) #reads byte from Operation command
-#    print("0x%x" % oper[0])
-#    print("0x%x" % oper[1])
+#Single Read Write
+def OneRW(devAdd0):
+    byte = int(input("Choose data to write and read"), 16)
+    if byte == 0x47:
+        IOutOCFaultResponseRW(devAdd0)
 
 def FaultsRW(devAdd0, actionB, writeB):
     Bus.write_byte_data(devAdd0, actionB, writeB)
@@ -46,7 +43,6 @@ def IOutOCFaultResponseRW(devAdd0):
 def VOutMode(devAdd0):
     f = Bus.read_byte_data(devAdd0, 0x20)
     print("0x%x" % f)
-#IOutFault(0x23)
 def ReadVOut(devAdd0):
     v = Bus.read_i2c_block_data(devAdd0, 0x8b, 2) #list of bytes
     #print(v)
@@ -93,8 +89,8 @@ def StatusWord(devAdd0):
     print(f'At device {devAdd0}: {word}')
 
 def StatusCML(devAdd):
-    commState = Bus.read_i2c_block_data(devAdd, 0x7e, 1)
-    print(commState)
+    commState = Bus.read_byte_data(devAdd, 0x7e)
+    print("0x%x" % commState)
 def VInOffRead(devAdd0):
     v_in = Bus.read_i2c_block_data(devAdd0, 0x36, 2)
     print(f'At device {devAdd0}: {v_in} volts')
@@ -180,4 +176,4 @@ def plotRead(devAdd, tDelay):
         ax.set_ylabel(f"{title} ({unit})")
         plt.show()
 
-plotRead(devAdd2, 0.05)
+#plotRead(devAdd2, 0.05)
