@@ -114,26 +114,6 @@ def VOutCommand(devAdd0):
     v_out = (2 ** -12) * manT #value from mantissa
     print(f'At device {devAdd0}: {v_out} volts')
 
-
-#yes = 'f'
-#while yes == 't':
-#    actB = int(input('Enter byte for data to read in hexadecimal: '), 16)
-#    writeB = int(input('Enter byte to write to register in hex: '), 16)
-#    FaultsRW(devAdd2, actB, writeB)
-#    yes = input("run again? (y/n)")
-#    if yes.lower() == 'y':
-#        yes = 't'
-#    elif yes.lower() == 'n':
-#        yes = 'f'
-#y1 = False
-#while y1 == True:
-#    VOutMode(devAdd2)
-#y2 = False
-#vals = []
-#while y2 == True:
-#    vals.append(ReadIOut(devAdd2))
-#print(max(vals))
-#readWord(devAdd2)
 def plotRead(devAdd, tDelay):
     read = int(input('Enter 0 (V_OUT), 1 (TEMP), 2 (V_IN), 3 (CURR): '))
     time = []
