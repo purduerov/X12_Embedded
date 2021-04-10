@@ -79,10 +79,28 @@
 #define CAN_ID_203_FLASH_MS 250
 #define CAN_ID_206_FLASH_MS 2000
 #define ERROR_FLASH_MS 4000
+
+#define TELEMETRY_PACKET_SIZE_REG 9
+#define TELEMETRY_PACKET_SIZE_CRC (TELEMETRY_PACKET_SIZE_REG + 1)
+#define TELEMETRY_PACKET_ARRIVAL_MS 10
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc;
+
+CAN_HandleTypeDef hcan;
+
+TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim14;
+
+UART_HandleTypeDef huart1;
+
+/* USER CODE BEGIN PV */
 static CanTxMsgTypeDef        TxMessage;
 static CanRxMsgTypeDef        RxMessage;
 ADC_ChannelConfTypeDef sConfig = {0};
@@ -93,18 +111,12 @@ int adc_val [4] = {0}; //stores the adc values from all 4 adc channels
 float MAX_VOLT = 3.3; //maximum voltage value for adc conversion
 float WANTED_VOLT = 1.5; //target voltage value for which the current is too high
 int spoof_ar [4] = {0, 127, 255, 200}; //a spoof array for testing pwm without CAN
-/* USER CODE END PM */
 
-/* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc;
-CAN_HandleTypeDef hcan;
-TIM_HandleTypeDef htim3;
-TIM_HandleTypeDef tim14;
+static int canId;
 
-uint8_t adcConfigured = 0;
-uint32_t canId;
-
-/* USER CODE BEGIN PV */
+static uint8_t telemetryBuffer[TELEMETRY_PACKET_SIZE_CRC] = {0};
+static uint8_t telemetryBytesRecieved;
+static volatile uint8_t sendTelemetry;
 
 /* USER CODE END PV */
 
@@ -114,8 +126,10 @@ static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
 static void MX_ADC_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_USART1_UART_Init(void);
 static void MX_TIM14_Init(void);
 /* USER CODE BEGIN PFP */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 
 /* USER CODE END PFP */
 
@@ -156,12 +170,12 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-  MX_ADC_Init();
   MX_GPIO_Init();
   MX_CAN_Init();
+  MX_ADC_Init();
   MX_TIM3_Init();
+  MX_USART1_UART_Init();
   MX_TIM14_Init();
-
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
@@ -197,6 +211,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
     check_error = HAL_CAN_GetError(&hcan);
 	if(check_error != 0)
@@ -220,8 +235,9 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-  /**Initializes the CPU, AHB and APB busses clocks 
+  /**Initializes the CPU, AHB and APB busses clocks
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSI14;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
@@ -233,7 +249,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /**Initializes the CPU, AHB and APB busses clocks 
+  /**Initializes the CPU, AHB and APB busses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1;
@@ -242,6 +258,12 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1;
+  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK1;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
@@ -254,6 +276,7 @@ void SystemClock_Config(void)
   */
 static void MX_ADC_Init(void)
 {
+
   /* USER CODE BEGIN ADC_Init 0 */
 
   /* USER CODE END ADC_Init 0 */
@@ -263,7 +286,7 @@ static void MX_ADC_Init(void)
   /* USER CODE BEGIN ADC_Init 1 */
 
   /* USER CODE END ADC_Init 1 */
-  /**Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
+  /**Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
   */
   hadc.Instance = ADC1;
   hadc.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
@@ -279,23 +302,40 @@ static void MX_ADC_Init(void)
   hadc.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc.Init.DMAContinuousRequests = DISABLE;
   hadc.Init.Overrun = ADC_OVR_DATA_PRESERVED;
-  hadc.State = HAL_ADC_STATE_RESET;
   if (HAL_ADC_Init(&hadc) != HAL_OK)
   {
     Error_Handler();
   }
-  /**Configure for the selected ADC regular channel to be converted. 
+  /**Configure for the selected ADC regular channel to be converted.
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_RANK_CHANNEL_NUMBER;
-  sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
   if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
   {
     Error_Handler();
   }
-
-  //  Calibration and Stabilization
-  HAL_ADCEx_Calibration_Start(&hadc);
+  /**Configure for the selected ADC regular channel to be converted.
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /**Configure for the selected ADC regular channel to be converted.
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /**Configure for the selected ADC regular channel to be converted.
+  */
+  sConfig.Channel = ADC_CHANNEL_3;
+  if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN ADC_Init 2 */
 
   /* USER CODE END ADC_Init 2 */
@@ -399,7 +439,7 @@ static void MX_TIM3_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 95;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -422,6 +462,72 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 2 */
   HAL_TIM_MspPostInit(&htim3);
+
+}
+
+/**
+  * @brief TIM14 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM14_Init(void)
+{
+
+  /* USER CODE BEGIN TIM14_Init 0 */
+
+  /* USER CODE END TIM14_Init 0 */
+
+  /* USER CODE BEGIN TIM14_Init 1 */
+
+  /* USER CODE END TIM14_Init 1 */
+  htim14.Instance = TIM14;
+  htim14.Init.Prescaler = 8000-1;
+  htim14.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim14.Init.Period = NUM_ADC_INT_WAIT_MS-1;
+  htim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim14) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM14_Init 2 */
+
+  /* USER CODE END TIM14_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
 
 }
 
@@ -477,7 +583,7 @@ void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 }
 
 //a function that was used to test the PWM signals without the use of CAN
-void CAN_Spoof(int* spoof_ar)
+void CAN_Spoof(int *spoof_ar)
 {
 	TIM3->CCR1 = byte_to_pwm(0); //U7
 	TIM3->CCR2 = byte_to_pwm(127); //U2
@@ -486,40 +592,61 @@ void CAN_Spoof(int* spoof_ar)
   //necessary portion
 }
 
-void  HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+void  HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
 	uint32_t adcValue = HAL_ADC_GetValue(hadc);
 
 	if (CAN_ID_201_LOW_THRESHOLD <= adcValue && adcValue <= CAN_ID_201_HIGH_THRESHOLD)
 	{
 		canId = 0x201;
-		tim14.Init.Period = CAN_ID_201_FLASH_MS - 1;
+		htim14.Init.Period = CAN_ID_201_FLASH_MS - 1;
 	}
 	else if (CAN_ID_202_LOW_THRESHOLD <= adcValue && adcValue <= CAN_ID_202_HIGH_THRESHOLD)
 	{
 		canId = 0x202;
-		tim14.Init.Period = CAN_ID_202_FLASH_MS - 1;
+		htim14.Init.Period = CAN_ID_202_FLASH_MS - 1;
 	}
 	else if (CAN_ID_203_LOW_THRESHOLD <= adcValue && adcValue <= CAN_ID_203_HIGH_THRESHOLD)
 	{
 		canId = 0x203;
-		tim14.Init.Period = CAN_ID_203_FLASH_MS - 1;
+		htim14.Init.Period = CAN_ID_203_FLASH_MS - 1;
 	}
 	else if (CAN_ID_206_LOW_THRESHOLD <= adcValue && adcValue <= CAN_ID_206_HIGH_THRESHOLD)
 	{
 		canId = 0x206;
-		tim14.Init.Period = CAN_ID_206_FLASH_MS - 1;
+		htim14.Init.Period = CAN_ID_206_FLASH_MS - 1;
 	}
 	else
 	{
-		tim14.Init.Period = ERROR_FLASH_MS - 1;
+		htim14.Init.Period = ERROR_FLASH_MS - 1;
 	}
 
 	//  Restart TIM14 to flash PA15 LED
 	HAL_ADC_Stop_IT(hadc);
-	tim14.Instance->ARR = tim14.Init.Period;
-	HAL_TIM_Base_Start_IT(&tim14);
+	htim14.Instance->ARR = htim14.Init.Period;
+	HAL_TIM_Base_Start_IT(&htim14);
 
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if(telemetryBytesRecieved == 10)
+		return;
+	telemetryBuffer[telemetryBytesRecieved] = huart->pRxBuffPtr[0];
+	++telemetryBytesRecieved;
+	if(telemetryBytesRecieved == 1) {
+		// start timer. A new packet is sent every 32 ms.
+		// The Telemetry packet should arrive in the first 10 ms.
+		// After 10 ms, send whatever has been received, which may or may not include a 10th CRC byte.
+		// HAL_TIM_Base_Start_IT(&htim16);
+		telemetryBuffer[TELEMETRY_PACKET_SIZE_CRC - 1] = 0;  // Clear the CRC byte in case this packet doesn't have one.
+	} else if (telemetryBytesRecieved == 10) {
+		// As an optimization, if we've gotten all 10 bytes, don't bother waiting and set them to be sent.
+		// Stop timer
+		// HAL_TIM_Base_Stop_IT(&htim16);
+		// TIM16->CNT = 0;
+		sendTelemetry = 1;
+	}
 }
 /* USER CODE END 4 */
 
@@ -545,40 +672,6 @@ void Error_Handler(void)
   /* USER CODE END Error_Handler_Debug */
 }
 
-static void MX_TIM14_Init(void)
-{
-	tim14.Instance = TIM14;
-
-	//  Initialize Counter to generate UEV after NUM_ADC_INIT_WAIT_MS milliseconds
-	tim14.Init.Prescaler = 8000 - 1;
-	tim14.Init.CounterMode = TIM_COUNTERMODE_UP;
-	tim14.Init.Period = NUM_ADC_INIT_WAIT_MS - 1;
-	tim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-	tim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-
-	if (HAL_TIM_Base_Init(&tim14) != HAL_OK)
-	{
-		Error_Handler();
-	}
-
-	tim14.Instance->SR = 0;
-	HAL_TIM_Base_Start_IT(&tim14);
-}
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
-{
-	if (!adcConfigured)
-	{
-		HAL_TIM_Base_Stop_IT(htim);
-		HAL_ADC_Start_IT(&hadc);
-		adcConfigured = 1;
-	}
-	else
-	{
-		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_15);
-	}
-}
-
 #ifdef  USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
@@ -588,7 +681,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
   * @retval None
   */
 void assert_failed(char *file, uint32_t line)
-{ 
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */

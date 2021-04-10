@@ -80,6 +80,7 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define NUM_ADC_INT_WAIT_MS 500
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
