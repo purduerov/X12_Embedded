@@ -79,6 +79,10 @@
 #define CAN_ID_203_FLASH_MS 250
 #define CAN_ID_206_FLASH_MS 2000
 #define ERROR_FLASH_MS 4000
+
+#define TELEMETRY_PACKET_SIZE_REG 9
+#define TELEMETRY_PACKET_SIZE_CRC (TELEMETRY_PACKET_SIZE_REG + 1)
+#define TELEMETRY_PACKET_ARRIVAL_MS 10
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -101,11 +105,16 @@ CAN_HandleTypeDef hcan;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef tim14;
 
-uint8_t adcConfigured = 0;
-uint32_t canId;
+UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
+uint8_t adcConfigured = 0;
+uint32_t canId;
+
+static uint8_t telemetryBuffer[TELEMETRY_PACKET_SIZE_CRC] = {0};
+static uint8_t telemetryBytesRecieved;
+static volatile uint8_t sendTelemetry;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -115,6 +124,7 @@ static void MX_CAN_Init(void);
 static void MX_ADC_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM14_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -162,6 +172,7 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM14_Init();
 
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
@@ -220,8 +231,9 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-  /**Initializes the CPU, AHB and APB busses clocks 
+  /**Initializes the CPU, AHB and APB busses clocks
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSI14;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
@@ -233,7 +245,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /**Initializes the CPU, AHB and APB busses clocks 
+  /**Initializes the CPU, AHB and APB busses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1;
@@ -263,7 +275,7 @@ static void MX_ADC_Init(void)
   /* USER CODE BEGIN ADC_Init 1 */
 
   /* USER CODE END ADC_Init 1 */
-  /**Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
+  /**Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
   */
   hadc.Instance = ADC1;
   hadc.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
@@ -426,6 +438,41 @@ static void MX_TIM3_Init(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -576,6 +623,27 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 	else
 	{
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_15);
+	}
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if(telemetryBytesRecieved == 10)
+		return;
+	telemetryBuffer[telemetryBytesRecieved] = huart->pRxBuffPtr[0];
+	++telemetryBytesRecieved;
+	if(telemetryBytesRecieved == 1) {
+		// start timer. A new packet is sent every 32 ms.
+		// The Telemetry packet should arrive in the first 10 ms.
+		// After 10 ms, send whatever has been received, which may or may not include a 10th CRC byte.
+		// HAL_TIM_Base_Start_IT(&htim16);
+		telemetryBuffer[TELEMETRY_PACKET_SIZE_CRC - 1] = 0;  // Clear the CRC byte in case this packet doesn't have one.
+	} else if (telemetryBytesRecieved == 10) {
+		// As an optimization, if we've gotten all 10 bytes, don't bother waiting and set them to be sent.
+		// Stop timer
+		// HAL_TIM_Base_Stop_IT(&htim16);
+		// TIM16->CNT = 0;
+		sendTelemetry = 1;
 	}
 }
 
